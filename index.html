@@ -282,7 +282,7 @@ async function loadCSVStimuli(){
   console.log("CSV Headers found:", header);
 
   // Updated expected CSV headers including avg_favorability
-  const expectedCsvHeaders = ['item', 'claim', 'clickbait', 'veracity', 'party'];
+  const expectedCsvHeaders = ['item', 'claim', 'clickbait', 'veracity', 'favorability'];
   for (const reqHeader of expectedCsvHeaders) {
       if (!header.includes(reqHeader)) {
           throw new Error(`CSV file is missing required header: '${reqHeader}'. Found headers: ${header.join(', ')}`);
@@ -321,12 +321,12 @@ async function loadCSVStimuli(){
 
     const truthValue = rawStim.veracity.toUpperCase() === 'TRUE';
     let partisanAlignment;
-    if (rawStim.party.toLowerCase() === 'republican') {
+    if (rawStim.favorability.toLowerCase() === 'republican') {
         partisanAlignment = 'Right';
-    } else if (rawStim.party.toLowerCase() === 'democrat') {
+    } else if (rawStim.favorability.toLowerCase() === 'democrat') {
         partisanAlignment = 'Left';
     } else {
-        console.warn(`Unknown party '${rawStim.party}' for Item ${itemNum}. Defaulting to Neutral/Undefined.`);
+        console.warn(`Unknown favorability '${rawStim.favorability}' for Item ${itemNum}. Defaulting to Neutral/Undefined.`);
         partisanAlignment = 'Neutral'; 
     }
 
