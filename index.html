@@ -88,14 +88,58 @@ const CONFIG = {
   itiMinDuration         : 500,
   itiMaxDuration         : 1000,
   
-  numPracticeTrials      : 4,
-  numTrialsPerCell       : 8, // This now applies to 4 cells (1 chosen headline type x 2 truth x 2 congruence)
+  numPracticeTrials      : 4, // We will now have exactly 4 practice trials from predefined list
+  numTrialsPerCell       : 8, // This applies to 4 cells (1 chosen headline type x 2 truth x 2 congruence)
   trialsPerBreak         : 16,
 
   // headline types, truthValues, congruenceLevels for structure definition
   headlineTypes          : ['Clickbait', 'Not Clickbait'],
   truthValues            : ['True', 'False'], 
   congruenceLevels       : ['Congruent', 'Incongruent'],
+
+  // NEW: Predefined practice trials - obvious facts and myths
+  practiceTrials         : [
+    {
+      statement_id: 'practice_fact_1',
+      statement_text: 'Water freezes at 0 degrees Celsius at standard atmospheric pressure.',
+      headline_type: 'Not Clickbait', // This will be ignored in practice, both headline types will see this
+      truth_value: true,
+      partisan_alignment: 'Neutral',
+      is_practice_stimulus: true,
+      is_attention_check: false,
+      partisan_congruence: 'Neutral'
+    },
+    {
+      statement_id: 'practice_fact_2',
+      statement_text: 'The Earth orbits around the Sun, completing one orbit approximately every 365 days.',
+      headline_type: 'Not Clickbait',
+      truth_value: true,
+      partisan_alignment: 'Neutral',
+      is_practice_stimulus: true,
+      is_attention_check: false,
+      partisan_congruence: 'Neutral'
+    },
+    {
+      statement_id: 'practice_myth_1',
+      statement_text: 'Humans only use 10% of their brains in daily life.',
+      headline_type: 'Clickbait',
+      truth_value: false,
+      partisan_alignment: 'Neutral',
+      is_practice_stimulus: true,
+      is_attention_check: false,
+      partisan_congruence: 'Neutral'
+    },
+    {
+      statement_id: 'practice_myth_2',
+      statement_text: 'The Great Wall of China is the only human-made structure visible from the Moon with the naked eye.',
+      headline_type: 'Clickbait',
+      truth_value: false,
+      partisan_alignment: 'Neutral',
+      is_practice_stimulus: true,
+      is_attention_check: false,
+      partisan_congruence: 'Neutral'
+    }
+  ],
 
   masterHeader : [ 
     'prolific_id', 'political_orientation', 'participant_headline_type', 
@@ -112,7 +156,7 @@ const CONFIG = {
 const state = {
   prolificID              : '',
   politicalOrientation    : '',
-  participantHeadlineType : '', // Changed from participantSentimentGroup
+  participantHeadlineType : '',
   
   allStimuli              : [], 
   practiceStimuli         : [], 
@@ -278,9 +322,10 @@ async function loadCSVStimuli(){
     }
   });
   
-  // Initial check for total stimuli loaded before filtering
-  if (state.allStimuli.length < (CONFIG.numTrialsPerCell * 4) + CONFIG.numPracticeTrials) { // 4 cells for the chosen headline type
-    console.warn(`Potentially insufficient total stimuli loaded from CSV (${state.allStimuli.length}) before headline type filtering. More might be needed depending on headline type distribution.`);
+  // Check for sufficient stimuli for main trials (not including practice anymore)
+  const minRequiredStimuli = CONFIG.numTrialsPerCell * 4; // 4 cells total
+  if (state.allStimuli.length < minRequiredStimuli) {
+    console.warn(`Potentially insufficient total stimuli loaded from CSV (${state.allStimuli.length}). Need at least ${minRequiredStimuli} for main experiment.`);
   }
 }
 
@@ -317,7 +362,7 @@ function waitKeysOrTimeout(validKeys, timeoutMs) {
   });
 }
 
-// ------------------- STIMULUS PREPARATION & COUNTERBALANCING (MODIFIED FOR HEADLINE TYPE) -------------------
+// ------------------- STIMULUS PREPARATION & COUNTERBALANCING (MODIFIED TO USE PREDEFINED PRACTICE TRIALS) -------------------
 function prepareExperimentTrials() {
     if (state.allStimuli.length === 0) {
         throw new Error("No stimuli loaded. Cannot prepare trials.");
@@ -326,7 +371,11 @@ function prepareExperimentTrials() {
         throw new Error("Participant headline type not selected. Cannot prepare trials.");
     }
 
-    // 1. Filter all stimuli by participant's chosen headline type
+    // 1. Use predefined practice trials instead of filtering from CSV
+    state.practiceStimuli = [...CONFIG.practiceTrials]; // Copy the predefined practice trials
+    shuffle(state.practiceStimuli); // Randomize order of practice trials
+    
+    // 2. Filter main experiment stimuli by participant's chosen headline type
     const headlineTypeFilteredStimuli = state.allStimuli.filter(
         stim => stim.headline_type === state.participantHeadlineType
     );
@@ -335,18 +384,7 @@ function prepareExperimentTrials() {
         throw new Error(`No stimuli found for the selected headline type: '${state.participantHeadlineType}'. Check CSV content and distribution.`);
     }
     shuffle(headlineTypeFilteredStimuli); 
-
-    // 2. Select Practice Stimuli from the headline-type-filtered pool
-    if (headlineTypeFilteredStimuli.length < CONFIG.numPracticeTrials) {
-        throw new Error(`Not enough stimuli in headline type '${state.participantHeadlineType}' (${headlineTypeFilteredStimuli.length}) to select ${CONFIG.numPracticeTrials} for practice.`);
-    }
-    state.practiceStimuli = headlineTypeFilteredStimuli.slice(0, CONFIG.numPracticeTrials);
-    state.practiceStimuli.forEach(s => s.is_practice_stimulus = true);
     
-    // Remaining stimuli for the main task, also from the headline-type-filtered pool
-    const availableForMain = headlineTypeFilteredStimuli.filter(s => !state.practiceStimuli.find(p => p.statement_id === s.statement_id));
-    shuffle(availableForMain);
-
     // 3. Assign Congruence and Prepare Cells for Main Experiment (within the chosen headline type)
     const cells = {}; 
     // Only create cells for the participant's chosen headline type
@@ -359,10 +397,7 @@ function prepareExperimentTrials() {
         });
     });
 
-    availableForMain.forEach(stim => {
-        // Ensure stimulus headline type matches participant's chosen group (should already be true due to initial filter)
-        if (stim.headline_type !== chosenHeadlineType) return; 
-
+    headlineTypeFilteredStimuli.forEach(stim => {
         let congruence;
         if (stim.partisan_alignment === 'Neutral' || !stim.partisan_alignment) { 
             congruence = Math.random() < 0.5 ? 'Congruent' : 'Incongruent'; 
@@ -375,7 +410,7 @@ function prepareExperimentTrials() {
         }
         
         const truthKey = stim.truth_value ? 'True' : 'False'; 
-        // Cell structure is now cells[CHOSEN_HEADLINE_TYPE][CONGRUENCE][TRUTH_VALUE]
+        // Cell structure is cells[CHOSEN_HEADLINE_TYPE][CONGRUENCE][TRUTH_VALUE]
         if (cells[chosenHeadlineType][congruence] && cells[chosenHeadlineType][congruence][truthKey]) {
              cells[chosenHeadlineType][congruence][truthKey].push({...stim, partisan_congruence: congruence});
         } else {
@@ -383,7 +418,7 @@ function prepareExperimentTrials() {
         }
     });
 
-    // 4. Sample from Cells (now only 4 cells per participant)
+    // 4. Sample from Cells (4 cells per participant)
     state.mainExperimentStimuli = [];
     CONFIG.congruenceLevels.forEach(cong => {
         CONFIG.truthValues.forEach(truth => {
@@ -402,7 +437,7 @@ function prepareExperimentTrials() {
     
     shuffle(state.mainExperimentStimuli);
     
-    // Total expected main trials is now 4 cells * numTrialsPerCell
+    // Total expected main trials is 4 cells * numTrialsPerCell
     const totalExpectedMainTrials = CONFIG.congruenceLevels.length * CONFIG.truthValues.length * CONFIG.numTrialsPerCell;
     if (state.mainExperimentStimuli.length < totalExpectedMainTrials) {
          console.warn(`Final main experiment trial count for headline type '${chosenHeadlineType}' is ${state.mainExperimentStimuli.length}, expected ${totalExpectedMainTrials}.`);
@@ -532,7 +567,7 @@ async function runSingleTrial(stimulus, isPracticeTrial = false) {
     trial_number_in_block: state.currentTrialInBlock,
     statement_id: stimulus.statement_id,
     statement_text: stimulus.statement_text, 
-    headline_type: stimulus.headline_type, // This is the headline type of the actual statement
+    headline_type: isPracticeTrial ? 'Practice' : stimulus.headline_type, // Mark practice trials with 'Practice' headline type
     truth_value_stimulus: stimulus.truth_value ? 'TRUE' : 'FALSE', 
     partisan_alignment_stimulus: stimulus.partisan_alignment,
     partisan_congruence: stimulus.partisan_congruence || 'N/A', 
@@ -550,22 +585,94 @@ async function runSingleTrial(stimulus, isPracticeTrial = false) {
   await sleep(itiDuration);
 }
 
-// ------------------- BLOCKS & EXPERIMENT FLOW (Unchanged logic, renamed variables) -------------------
+// ------------------- BLOCKS & EXPERIMENT FLOW (UPDATED FOR PRACTICE TRIAL FEEDBACK) -------------------
 async function runPracticeBlock() {
     state.currentBlock = 'Practice';
     state.currentTrialInBlock = 0;
-    show(`<div class="message-container"><h2>Practice Round</h2><p>You will now see a few practice statements.</p><p>Press SPACE to begin.</p></div>`);
+    show(`<div class="message-container"><h2>Practice Round</h2><p>You will now see a few practice statements that have clear correct answers.</p><p>Press SPACE to begin.</p></div>`);
     await waitKeys([' ']);
 
     if (state.practiceStimuli.length === 0) {
-        show(`<div class="message-container"><p class="error-text">No practice stimuli available for the selected headline type. Please check configuration.</p></div>`);
-        return Promise.reject("No practice stimuli for headline type");
+        show(`<div class="message-container"><p class="error-text">No practice stimuli available. Please check configuration.</p></div>`);
+        return Promise.reject("No practice stimuli defined");
     }
+    
+    // Run through practice trials with feedback
     for (const stimulus of state.practiceStimuli) {
-        await runSingleTrial(stimulus, true);
+        // Show the stimulus
+        state.trialCountOverall++;
+        state.currentTrialInBlock++;
+        
+        // 1. Fixation Cross
+        show(`<div class="fixation-cross-container">+</div>`);
+        await sleep(CONFIG.fixationCrossDuration);
+
+        // 2. Statement Display
+        show(`
+          <div class="stimulus-container">
+            <p class="stimulus-text">${stimulus.statement_text}</p> 
+            <p class="key-reminder">TRUE = '${CONFIG.responseKeys.true_key.toUpperCase()}' / FALSE = '${CONFIG.responseKeys.false_key.toUpperCase()}'</p>
+          </div>
+        `);
+        
+        rtClock = performance.now();
+
+        // 3. Get Response
+        const responseResult = await waitKeysOrTimeout([CONFIG.responseKeys.true_key, CONFIG.responseKeys.false_key], CONFIG.statementTimeoutDuration);
+        const rt = responseResult.timedOut ? CONFIG.statementTimeoutDuration : Math.round(performance.now() - rtClock);
+        
+        let participantResponse = null;
+        let accuracy = null;
+
+        if (responseResult.timedOut) {
+          participantResponse = 'TIMEOUT';
+          accuracy = null;
+          // Show timeout feedback
+          show(`<div class="message-container"><h3>Time's Up!</h3><p>Please try to respond more quickly.</p><p>Press SPACE to continue.</p></div>`);
+        } else {
+          participantResponse = responseResult.key === CONFIG.responseKeys.true_key ? 'True' : 'False';
+          accuracy = (participantResponse === 'True') === stimulus.truth_value ? 1 : 0;
+          
+          // Show feedback based on accuracy
+          if (accuracy === 1) {
+            show(`<div class="message-container"><h3>Correct!</h3><p>This statement is ${stimulus.truth_value ? 'TRUE' : 'FALSE'}.</p><p>Press SPACE to continue.</p></div>`);
+          } else {
+            show(`<div class="message-container"><h3>Incorrect</h3><p>This statement is actually ${stimulus.truth_value ? 'TRUE' : 'FALSE'}.</p><p>Press SPACE to continue.</p></div>`);
+          }
+        }
+
+        // 4. Log Data
+        const trialData = {
+          prolific_id: state.prolificID,
+          political_orientation: state.politicalOrientation,
+          participant_headline_type: state.participantHeadlineType,
+          trial_number_overall: state.trialCountOverall,
+          block_type: state.currentBlock,
+          trial_number_in_block: state.currentTrialInBlock,
+          statement_id: stimulus.statement_id,
+          statement_text: stimulus.statement_text, 
+          headline_type: 'Practice', // Mark as practice
+          truth_value_stimulus: stimulus.truth_value ? 'TRUE' : 'FALSE', 
+          partisan_alignment_stimulus: stimulus.partisan_alignment,
+          partisan_congruence: stimulus.partisan_congruence || 'N/A', 
+          is_practice_trial: 1,
+          is_attention_check: stimulus.is_attention_check ? 1 : 0, 
+          response: participantResponse,
+          accuracy: accuracy,
+          rt_ms: rt,
+        };
+        log(trialData);
+
+        // Wait for space to continue
+        await waitKeys([' ']);
+        
+        // 5. Inter-Trial Interval (ITI)
+        show(''); 
+        const itiDuration = getRandomInt(CONFIG.itiMinDuration, CONFIG.itiMaxDuration);
+        await sleep(itiDuration);
     }
 
-    show(`<div class="message-container"><h2>End of Practice</h2><p>You have completed the practice round.</p><button id="startMainBtn">Start Main Experiment</button></div>`);
+    show(`<div class="message-container"><h2>End of Practice</h2><p>You have completed the practice round. Now you will move on to the main experiment with political headlines.</p><button id="startMainBtn">Start Main Experiment</button></div>`);
     return new Promise(resolve => {
         document.getElementById('startMainBtn').onclick = resolve;
     });
@@ -646,8 +753,8 @@ function finishExperiment(){
     await introScreen(); // Collects Prolific ID, political orientation, AND participant headline type
     
     show('<h2>Preparing experiment trials...</h2>');
-    prepareExperimentTrials(); // Now filters by headline type and prepares 4 cells
-
+    prepareExperimentTrials(); // Now uses predefined practice trials and filters main trials by headline type
+    
     await showInstructionsScreen();
     await runPracticeBlock();
     await runMainExperimentBlock();
