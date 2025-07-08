@@ -69,6 +69,14 @@
     .key-reminder { font-size:1rem; color: #ccc; margin-top: 1em;}
     .loading, .error-text { font-size:1.2rem; color: #aaa; }
     .input-label { display: block; margin-top: 1em; margin-bottom: 0.2em; }
+    .key-display { 
+      display: inline-block; 
+      padding: 5px 15px;
+      margin: 0 5px;
+      background: #333;
+      border-radius: 5px;
+      font-weight: bold;
+    }
   </style>
 </head>
 <body>
@@ -79,7 +87,11 @@
 const CONFIG = {
   experimentName         : 'Political Truth Judgment Task (Headline Type Filtered)',
   csvFile                : 'stimulus_master.csv', 
-  responseKeys           : { true_key: 'f', false_key: 'j' }, 
+  // Response keys will be assigned randomly at startup
+  responseKeys           : { 
+    true_key: null,  // Will be assigned 'q' or 'p' 
+    false_key: null, // Will be assigned the other key
+  },
   dataPipeID             : 'qWHxwr6D720q', 
   fallbackDownload       : true, 
   
@@ -88,8 +100,8 @@ const CONFIG = {
   itiMinDuration         : 500,
   itiMaxDuration         : 1000,
   
-  numPracticeTrials      : 4, // We will now have exactly 4 practice trials from predefined list
-  numTrialsPerCell       : 8, // This applies to 4 cells (1 chosen headline type x 2 truth x 2 congruence)
+  numPracticeTrials      : 4,
+  numTrialsPerCell       : 8, 
   trialsPerBreak         : 16,
 
   // headline types, truthValues, congruenceLevels for structure definition
@@ -97,12 +109,12 @@ const CONFIG = {
   truthValues            : ['True', 'False'], 
   congruenceLevels       : ['Congruent', 'Incongruent'],
 
-  // NEW: Predefined practice trials - obvious facts and myths
+  // Predefined practice trials - obvious facts and myths
   practiceTrials         : [
     {
       statement_id: 'practice_fact_1',
       statement_text: 'Water freezes at 0 degrees Celsius at standard atmospheric pressure.',
-      headline_type: 'Not Clickbait', // This will be ignored in practice, both headline types will see this
+      headline_type: 'Not Clickbait',
       truth_value: true,
       partisan_alignment: 'Neutral',
       is_practice_stimulus: true,
@@ -142,7 +154,7 @@ const CONFIG = {
   ],
 
   masterHeader : [ 
-    'prolific_id', 'political_orientation', 'participant_headline_type', 
+    'prolific_id', 'political_orientation', 'participant_headline_type', 'key_assignment',
     'trial_number_overall', 'block_type', 'trial_number_in_block',
     'statement_id', 'statement_text', 
     'headline_type', 'truth_value_stimulus', 'partisan_alignment_stimulus', 'partisan_congruence',
@@ -157,6 +169,7 @@ const state = {
   prolificID              : '',
   politicalOrientation    : '',
   participantHeadlineType : '',
+  keyAssignment           : '', // Will store which key is assigned to "true"
   
   allStimuli              : [], 
   practiceStimuli         : [], 
@@ -170,6 +183,27 @@ const state = {
 const stage = document.getElementById('stage');
 let rtClock = 0;
 
+// Randomize response key assignment at startup
+function assignResponseKeys() {
+  // Randomly decide if 'q' means true (50% chance)
+  const qIsTrue = Math.random() < 0.5;
+  
+  if (qIsTrue) {
+    CONFIG.responseKeys.true_key = 'q';
+    CONFIG.responseKeys.false_key = 'p';
+    state.keyAssignment = 'q=true_p=false';
+  } else {
+    CONFIG.responseKeys.true_key = 'p';
+    CONFIG.responseKeys.false_key = 'q';
+    state.keyAssignment = 'p=true_q=false';
+  }
+  
+  console.log(`Key assignment: TRUE=${CONFIG.responseKeys.true_key}, FALSE=${CONFIG.responseKeys.false_key}`);
+}
+
+// Call this immediately to set up the key assignment
+assignResponseKeys();
+
 // ------------------------ UTILITY FUNCTIONS ------------------------
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const shuffle = arr => { for(let i = arr.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [arr[i], arr[j]] = [arr[j], arr[i]]; } return arr; };
@@ -179,6 +213,9 @@ const getRandomInt = (min, max) => Math.floor(Math.random() * (max - min + 1)) +
 // ------------------------ DATA LOGGING FUNCTIONS ------------------------
 function log(dataRow) {
   dataRow.timestamp = new Date().toISOString();
+  // Add key assignment to every row
+  dataRow.key_assignment = state.keyAssignment;
+  
   const completeRow = {};
   CONFIG.masterHeader.forEach(header => {
     completeRow[header] = (header in dataRow) ? dataRow[header] : '';
@@ -329,7 +366,7 @@ async function loadCSVStimuli(){
   }
 }
 
-// ------------------- KEYBOARD HELPERS (Unchanged) -------------------
+// ------------------- KEYBOARD HELPERS (MODIFIED FOR Q/P KEYS) -------------------
 function waitKeys(validKeys) {
   return new Promise(resolve => {
     function onKey(e) {
@@ -493,7 +530,7 @@ async function introScreen(){
   });
 }
 
-// ------------------- INSTRUCTIONS SCREEN (Unchanged) -------------------
+// ------------------- INSTRUCTIONS SCREEN (UPDATED FOR Q/P KEYS) -------------------
 async function showInstructionsScreen() {
     show(`
         <div class="message-container">
@@ -505,9 +542,9 @@ async function showInstructionsScreen() {
                 <br><br>
                 Your task is to decide if the statement is TRUE or FALSE.
                 <br><br>
-                Press the '<b>${CONFIG.responseKeys.true_key.toUpperCase()}</b>' key if you think it's TRUE.
+                Press the <span class="key-display">${CONFIG.responseKeys.true_key.toUpperCase()}</span> key if you think it's TRUE.
                 <br>
-                Press the '<b>${CONFIG.responseKeys.false_key.toUpperCase()}</b>' key if you think it's FALSE.
+                Press the <span class="key-display">${CONFIG.responseKeys.false_key.toUpperCase()}</span> key if you think it's FALSE.
                 <br><br>
                 Please respond as quickly and as accurately as you can.
                 <br><br>
@@ -523,7 +560,7 @@ async function showInstructionsScreen() {
 }
 
 
-// ------------------- CORE TRIAL LOGIC (MODIFIED FOR LOGGING HEADLINE TYPE) -------------------
+// ------------------- CORE TRIAL LOGIC (MODIFIED FOR Q/P KEYS) -------------------
 async function runSingleTrial(stimulus, isPracticeTrial = false) {
   state.trialCountOverall++;
   state.currentTrialInBlock++;
@@ -532,17 +569,17 @@ async function runSingleTrial(stimulus, isPracticeTrial = false) {
   show(`<div class="fixation-cross-container">+</div>`);
   await sleep(CONFIG.fixationCrossDuration);
 
-  // 2. Statement Display
+  // 2. Statement Display with updated key reminder
   show(`
     <div class="stimulus-container">
       <p class="stimulus-text">${stimulus.statement_text}</p> 
-      <p class="key-reminder">TRUE = '${CONFIG.responseKeys.true_key.toUpperCase()}' / FALSE = '${CONFIG.responseKeys.false_key.toUpperCase()}'</p>
+      <p class="key-reminder">TRUE = <span class="key-display">${CONFIG.responseKeys.true_key.toUpperCase()}</span> / FALSE = <span class="key-display">${CONFIG.responseKeys.false_key.toUpperCase()}</span></p>
     </div>
   `);
   
   rtClock = performance.now();
 
-  // 3. Get Response
+  // 3. Get Response (now using q and p keys)
   const responseResult = await waitKeysOrTimeout([CONFIG.responseKeys.true_key, CONFIG.responseKeys.false_key], CONFIG.statementTimeoutDuration);
   const rt = responseResult.timedOut ? CONFIG.statementTimeoutDuration : Math.round(performance.now() - rtClock);
   
@@ -553,21 +590,23 @@ async function runSingleTrial(stimulus, isPracticeTrial = false) {
     participantResponse = 'TIMEOUT';
     accuracy = null; 
   } else {
+    // Determine which response was given based on the key assignment
     participantResponse = responseResult.key === CONFIG.responseKeys.true_key ? 'True' : 'False';
     accuracy = (participantResponse === 'True') === stimulus.truth_value ? 1 : 0;
   }
 
-  // 4. Log Data
+  // 4. Log Data (now with key assignment)
   const trialData = {
     prolific_id: state.prolificID,
     political_orientation: state.politicalOrientation,
-    participant_headline_type: state.participantHeadlineType, // Log selected headline type
+    participant_headline_type: state.participantHeadlineType,
+    key_assignment: state.keyAssignment, // Record which key was assigned to which response
     trial_number_overall: state.trialCountOverall,
     block_type: state.currentBlock,
     trial_number_in_block: state.currentTrialInBlock,
     statement_id: stimulus.statement_id,
     statement_text: stimulus.statement_text, 
-    headline_type: isPracticeTrial ? 'Practice' : stimulus.headline_type, // Mark practice trials with 'Practice' headline type
+    headline_type: isPracticeTrial ? 'Practice' : stimulus.headline_type,
     truth_value_stimulus: stimulus.truth_value ? 'TRUE' : 'FALSE', 
     partisan_alignment_stimulus: stimulus.partisan_alignment,
     partisan_congruence: stimulus.partisan_congruence || 'N/A', 
@@ -585,11 +624,18 @@ async function runSingleTrial(stimulus, isPracticeTrial = false) {
   await sleep(itiDuration);
 }
 
-// ------------------- BLOCKS & EXPERIMENT FLOW (UPDATED FOR PRACTICE TRIAL FEEDBACK) -------------------
+// ------------------- BLOCKS & EXPERIMENT FLOW (UPDATED FOR Q/P KEYS) -------------------
 async function runPracticeBlock() {
     state.currentBlock = 'Practice';
     state.currentTrialInBlock = 0;
-    show(`<div class="message-container"><h2>Practice Round</h2><p>You will now see a few practice statements that have clear correct answers.</p><p>Press SPACE to begin.</p></div>`);
+    show(`<div class="message-container">
+      <h2>Practice Round</h2>
+      <p>You will now see a few practice statements that have clear correct answers.</p>
+      <p>Remember:<br>
+      TRUE = <span class="key-display">${CONFIG.responseKeys.true_key.toUpperCase()}</span><br>
+      FALSE = <span class="key-display">${CONFIG.responseKeys.false_key.toUpperCase()}</span></p>
+      <p>Press SPACE to begin.</p>
+    </div>`);
     await waitKeys([' ']);
 
     if (state.practiceStimuli.length === 0) {
@@ -607,17 +653,17 @@ async function runPracticeBlock() {
         show(`<div class="fixation-cross-container">+</div>`);
         await sleep(CONFIG.fixationCrossDuration);
 
-        // 2. Statement Display
+        // 2. Statement Display with updated key reminder
         show(`
           <div class="stimulus-container">
             <p class="stimulus-text">${stimulus.statement_text}</p> 
-            <p class="key-reminder">TRUE = '${CONFIG.responseKeys.true_key.toUpperCase()}' / FALSE = '${CONFIG.responseKeys.false_key.toUpperCase()}'</p>
+            <p class="key-reminder">TRUE = <span class="key-display">${CONFIG.responseKeys.true_key.toUpperCase()}</span> / FALSE = <span class="key-display">${CONFIG.responseKeys.false_key.toUpperCase()}</span></p>
           </div>
         `);
         
         rtClock = performance.now();
 
-        // 3. Get Response
+        // 3. Get Response (now using q and p keys)
         const responseResult = await waitKeysOrTimeout([CONFIG.responseKeys.true_key, CONFIG.responseKeys.false_key], CONFIG.statementTimeoutDuration);
         const rt = responseResult.timedOut ? CONFIG.statementTimeoutDuration : Math.round(performance.now() - rtClock);
         
@@ -635,23 +681,38 @@ async function runPracticeBlock() {
           
           // Show feedback based on accuracy
           if (accuracy === 1) {
-            show(`<div class="message-container"><h3>Correct!</h3><p>This statement is ${stimulus.truth_value ? 'TRUE' : 'FALSE'}.</p><p>Press SPACE to continue.</p></div>`);
+            show(`<div class="message-container">
+              <h3>Correct!</h3>
+              <p>This statement is ${stimulus.truth_value ? 'TRUE' : 'FALSE'}.</p>
+              <p>Remember:<br>
+              TRUE = <span class="key-display">${CONFIG.responseKeys.true_key.toUpperCase()}</span><br>
+              FALSE = <span class="key-display">${CONFIG.responseKeys.false_key.toUpperCase()}</span></p>
+              <p>Press SPACE to continue.</p>
+            </div>`);
           } else {
-            show(`<div class="message-container"><h3>Incorrect</h3><p>This statement is actually ${stimulus.truth_value ? 'TRUE' : 'FALSE'}.</p><p>Press SPACE to continue.</p></div>`);
+            show(`<div class="message-container">
+              <h3>Incorrect</h3>
+              <p>This statement is actually ${stimulus.truth_value ? 'TRUE' : 'FALSE'}.</p>
+              <p>Remember:<br>
+              TRUE = <span class="key-display">${CONFIG.responseKeys.true_key.toUpperCase()}</span><br>
+              FALSE = <span class="key-display">${CONFIG.responseKeys.false_key.toUpperCase()}</span></p>
+              <p>Press SPACE to continue.</p>
+            </div>`);
           }
         }
 
-        // 4. Log Data
+        // 4. Log Data (now with key assignment)
         const trialData = {
           prolific_id: state.prolificID,
           political_orientation: state.politicalOrientation,
           participant_headline_type: state.participantHeadlineType,
+          key_assignment: state.keyAssignment,
           trial_number_overall: state.trialCountOverall,
           block_type: state.currentBlock,
           trial_number_in_block: state.currentTrialInBlock,
           statement_id: stimulus.statement_id,
           statement_text: stimulus.statement_text, 
-          headline_type: 'Practice', // Mark as practice
+          headline_type: 'Practice',
           truth_value_stimulus: stimulus.truth_value ? 'TRUE' : 'FALSE', 
           partisan_alignment_stimulus: stimulus.partisan_alignment,
           partisan_congruence: stimulus.partisan_congruence || 'N/A', 
@@ -672,7 +733,14 @@ async function runPracticeBlock() {
         await sleep(itiDuration);
     }
 
-    show(`<div class="message-container"><h2>End of Practice</h2><p>You have completed the practice round. Now you will move on to the main experiment with political headlines.</p><button id="startMainBtn">Start Main Experiment</button></div>`);
+    show(`<div class="message-container">
+      <h2>End of Practice</h2>
+      <p>You have completed the practice round. Now you will move on to the main experiment with political headlines.</p>
+      <p>Remember:<br>
+      TRUE = <span class="key-display">${CONFIG.responseKeys.true_key.toUpperCase()}</span><br>
+      FALSE = <span class="key-display">${CONFIG.responseKeys.false_key.toUpperCase()}</span></p>
+      <button id="startMainBtn">Start Main Experiment</button>
+    </div>`);
     return new Promise(resolve => {
         document.getElementById('startMainBtn').onclick = resolve;
     });
@@ -681,7 +749,15 @@ async function runPracticeBlock() {
 async function runMainExperimentBlock() {
     state.currentBlock = 'MainExperiment';
     state.currentTrialInBlock = 0;
-    show(`<div class="message-container"><h2>Main Experiment</h2><p>The main experiment will now begin. Remember to respond as quickly and accurately as possible.<br>There will be short breaks periodically.</p><p>Press SPACE to begin.</p></div>`);
+    show(`<div class="message-container">
+      <h2>Main Experiment</h2>
+      <p>The main experiment will now begin. Remember to respond as quickly and accurately as possible.<br>
+      There will be short breaks periodically.</p>
+      <p>Remember:<br>
+      TRUE = <span class="key-display">${CONFIG.responseKeys.true_key.toUpperCase()}</span><br>
+      FALSE = <span class="key-display">${CONFIG.responseKeys.false_key.toUpperCase()}</span></p>
+      <p>Press SPACE to begin.</p>
+    </div>`);
     await waitKeys([' ']);
     
     if (state.mainExperimentStimuli.length === 0) {
@@ -693,7 +769,13 @@ async function runMainExperimentBlock() {
         await runSingleTrial(stimulus, false);
 
         if ((i + 1) < state.mainExperimentStimuli.length && (i + 1) % CONFIG.trialsPerBreak === 0) {
-            show(`<div class="message-container"><h2>Break Time!</h2><p>Please take a short break. Press SPACE when you are ready to continue.</p></div>`);
+            show(`<div class="message-container">
+              <h2>Break Time!</h2>
+              <p>Please take a short break. Press SPACE when you are ready to continue.</p>
+              <p>Remember:<br>
+              TRUE = <span class="key-display">${CONFIG.responseKeys.true_key.toUpperCase()}</span><br>
+              FALSE = <span class="key-display">${CONFIG.responseKeys.false_key.toUpperCase()}</span></p>
+            </div>`);
             await waitKeys([' ']);
             show(`<div class="fixation-cross-container">+</div>`); 
             await sleep(1000); 
@@ -703,7 +785,7 @@ async function runMainExperimentBlock() {
 
 function finishExperiment(){ 
   const csv = toCSV(state.data);
-  const filename  = `${CONFIG.experimentName.replace(/\s+/g, '_')}_${state.prolificID}_${state.participantHeadlineType}_${new Date().toISOString().slice(0,10)}.csv`; // Added headline type to filename
+  const filename  = `${CONFIG.experimentName.replace(/\s+/g, '_')}_${state.prolificID}_${state.participantHeadlineType}_${new Date().toISOString().slice(0,10)}.csv`;
   
   show('<div class="message-container"><h2>Uploading your data…</h2><p>Please wait. Do not close this window.</p></div>');
   
