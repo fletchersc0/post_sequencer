@@ -282,7 +282,7 @@ async function loadCSVStimuli(){
   console.log("CSV Headers found:", header);
 
   // Updated expected CSV headers including avg_favorability
-  const expectedCsvHeaders = ['item', 'original', 'clickbait', 'veracity', 'party'];
+  const expectedCsvHeaders = ['item', 'claim', 'clickbait', 'veracity', 'party'];
   for (const reqHeader of expectedCsvHeaders) {
       if (!header.includes(reqHeader)) {
           throw new Error(`CSV file is missing required header: '${reqHeader}'. Found headers: ${header.join(', ')}`);
@@ -350,11 +350,11 @@ async function loadCSVStimuli(){
         console.warn(`Missing 'clickbait' statement for Item ${itemNum}.`);
     }
     
-    // For non-clickbait version (using original)
-    if (rawStim.original) {
+    // For non-clickbait version (using claim)
+    if (rawStim.claim) {
         state.allStimuli.push({
             statement_id: `item${itemNum}_notclickbait`,
-            statement_text: rawStim.original,
+            statement_text: rawStim.claim,
             headline_type: 'Not Clickbait', 
             truth_value: truthValue,
             partisan_alignment: partisanAlignment,
@@ -363,7 +363,7 @@ async function loadCSVStimuli(){
             is_attention_check: false,   
         });
     } else {
-        console.warn(`Missing 'original' statement for Item ${itemNum}.`);
+        console.warn(`Missing 'claim' statement for Item ${itemNum}.`);
     }
   });
   
