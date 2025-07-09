@@ -105,7 +105,7 @@
 
 <script>
 // -------------------- CONFIG --------------------
-// Current Date and Time (UTC - YYYY-MM-DD HH:MM:SS formatted): 2025-07-09 04:10:29
+// Current Date and Time (UTC - YYYY-MM-DD HH:MM:SS formatted): 2025-07-09 04:25:25
 // Current User's Login: fletchersc0
 
 const CONFIG = {
@@ -267,6 +267,7 @@ function log(dataRow) {
   state.data.push(completeRow);
 }
 
+// FIXED: Modified toCSV function to handle cell formatting more consistently
 function toCSV(rows){
   if (!rows.length) return '';
   const header = CONFIG.masterHeader;
@@ -274,7 +275,7 @@ function toCSV(rows){
   rows.forEach(r => {
     const line = header.map(k => {
       let cell = (k in r && r[k] !== null && r[k] !== undefined) ? r[k] : '';
-      cell = String(cell).trim(); 
+      cell = String(cell); // Removed trim() to match working version
       if (/[",\n\r]/.test(cell)) cell = '"' + cell.replace(/"/g, '""') + '"';
       return cell;
     }).join(',');
@@ -283,15 +284,26 @@ function toCSV(rows){
   return lines.join('\n');
 }
 
+// FIXED: Updated uploadCSV function with correct URL (no trailing slash)
 function uploadCSV(filename, csvData){
   if (!CONFIG.dataPipeID || CONFIG.dataPipeID === 'YOUR_JSPSYCH_DATAPIPE_ID') {
       console.warn("DataPipeID not set or is placeholder. Skipping upload.");
       return Promise.resolve({ok: false, statusText: "DataPipeID not set"});
   }
-  return fetch('https://pipe.jspsych.org/api/data/', {
+  
+  console.log("Attempting to upload data to datapipe:", CONFIG.dataPipeID);
+  console.log("Filename:", filename);
+  console.log("Data size (bytes):", new Blob([csvData]).size);
+  
+  // FIXED: Removed trailing slash from API URL
+  return fetch('https://pipe.jspsych.org/api/data', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ experimentID: CONFIG.dataPipeID, filename: filename, data: csvData })
+    body: JSON.stringify({ 
+      experimentID: CONFIG.dataPipeID, 
+      filename: filename, 
+      data: csvData 
+    })
   });
 }
 
@@ -1125,21 +1137,24 @@ async function showDebriefing() {
   `);
 }
 
+// FIXED: Improved finishExperiment function with better error handling
 function finishExperiment(){ 
   const csv = toCSV(state.data);
-  const filename  = `${CONFIG.experimentName.replace(/\s+/g, '_')}_${state.prolificID}_${state.participantHeadlineType}_${new Date().toISOString().slice(0,10)}.csv`;
+  const filename = `${CONFIG.experimentName.replace(/\s+/g, '_')}_${state.prolificID}_${state.participantHeadlineType}_${new Date().toISOString().slice(0,10)}.csv`;
   
   show('<div class="message-container"><h2>Uploading your data…</h2><p>Please wait. Do not close this window.</p></div>');
   
-  // Log data to console for debugging and ensure we can continue to debriefing
-  console.log("Data to be uploaded:", csv);
+  // Only log data size, not the entire dataset
+  console.log(`Preparing to upload data (${new Blob([csv]).size} bytes)`);
   
-  // Try to upload data
+  // Try to upload data with improved error handling
   uploadCSV(filename, csv)
     .then(response => {
+      console.log("Upload response status:", response.status, response.statusText);
+      
+      // FIXED: Simplified error handling
       if (!response.ok) {
-        console.error('Upload failed with status:', response.status, response.statusText);
-        return response.text().then(text => {throw new Error(`Upload failed: ${response.statusText} - ${text}`)});
+        throw new Error(`HTTP ${response.status} ${response.statusText}`);
       }
       return response.json();
     })
