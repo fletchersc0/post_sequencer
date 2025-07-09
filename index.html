@@ -105,6 +105,9 @@
 
 <script>
 // -------------------- CONFIG --------------------
+// Current Date and Time (UTC): 2025-07-09 03:51:40
+// Current User's Login: fletchersc0
+
 const CONFIG = {
   experimentName         : 'Political Truth Judgment Task (Complete Statement Set)',
   csvFile                : 'stimulus_master.csv', 
@@ -123,10 +126,6 @@ const CONFIG = {
   
   numPracticeTrials      : 4,
   trialsPerBreak         : 16, // Break every 16 statements (reasonable for 64 total)
-
-  // Session info (for data logging only)
-  sessionDate            : '2025-07-09 02:49:40',
-  userLogin              : 'fletchersc0',
 
   // headline types, truthValues, congruenceLevels for structure definition
   headlineTypes          : ['Clickbait', 'Not Clickbait'],
@@ -186,7 +185,6 @@ const CONFIG = {
     'response', 'accuracy', 'rt_ms',
     'avg_favorability', // Added new column for data export
     'age', 'gender', 'education', // Added demographic variables
-    'session_date', 'user_login', // Session info for data logging
     'timestamp'
   ]
 };
@@ -202,10 +200,6 @@ const state = {
   age                     : null,
   gender                  : '',
   education               : '',
-  
-  // Session info
-  sessionDate             : CONFIG.sessionDate,
-  userLogin               : CONFIG.userLogin,
   
   allStimuli              : [], 
   practiceStimuli         : [], 
@@ -265,10 +259,6 @@ function log(dataRow) {
   dataRow.age = state.age;
   dataRow.gender = state.gender;
   dataRow.education = state.education;
-  
-  // Add session info to every row
-  dataRow.session_date = state.sessionDate;
-  dataRow.user_login = state.userLogin;
   
   const completeRow = {};
   CONFIG.masterHeader.forEach(header => {
@@ -818,7 +808,6 @@ async function showInstructionsScreen() {
     });
 }
 
-
 // ------------------- CORE TRIAL LOGIC (MODIFIED WITH CONSISTENT KEY REMINDER) -------------------
 async function runSingleTrial(stimulus, isPracticeTrial = false) {
   state.trialCountOverall++;
@@ -1062,6 +1051,78 @@ async function runMainExperimentBlock() {
     }
 }
 
+// ------------------- DEBRIEFING SCREEN (NEW) -------------------
+async function showDebriefing() {
+  // Determine which debriefing file to load based on participant's condition
+  const debriefFile = state.participantHeadlineType === 'Clickbait' ? 'debrief_clickbait.txt' : 'debrief_headline.txt';
+  const debriefPDF = state.participantHeadlineType === 'Clickbait' ? 'debrief_clickbait.pdf' : 'debrief_headline.pdf';
+  
+  // Default debriefing text in case the file cannot be loaded
+  let defaultDebriefHTML = `
+    <h2>Debriefing Statement</h2>
+    <p>Thank you for participating in our study on truth judgments of political headlines.</p>
+    <p>In this study, we were investigating how different presentation formats of the same information might influence people's judgments of truthfulness.</p>
+    <p>We presented you with headlines in a ${state.participantHeadlineType === 'Clickbait' ? 'clickbait' : 'straightforward news'} format to understand how this presentation style affects truth judgments.</p>
+    <p>Your data will help us better understand how information presentation influences belief formation and can inform strategies to combat misinformation.</p>
+    <p>If you have any questions about this research, please contact the research team.</p>
+  `;
+  
+  try {
+    // Try to load the appropriate debriefing file
+    const response = await fetch(debriefFile);
+    if (response.ok) {
+      // If file loaded successfully, use its content
+      const debriefContent = await response.text();
+      
+      show(`
+        <div class="info-container">
+          ${debriefContent}
+          <div class="button-container">
+            <a href="${debriefPDF}" download target="_blank" rel="noopener noreferrer" style="text-decoration: none;"><button>Download Debriefing (PDF)</button></a>
+            <a href="fact-checks.pdf" download target="_blank" rel="noopener noreferrer" style="text-decoration: none;"><button>Download Fact-Checking Sheet</button></a>
+            <button id="finish_btn">Finish</button>
+          </div>
+        </div>
+      `);
+    } else {
+      // If file couldn't be loaded, use the default text
+      console.warn(`Could not load debriefing file: ${debriefFile}`);
+      show(`
+        <div class="info-container">
+          ${defaultDebriefHTML}
+          <div class="button-container">
+            <button id="finish_btn">Finish</button>
+          </div>
+        </div>
+      `);
+    }
+  } catch (e) {
+    // If there was an error loading the file, use the default text
+    console.error(`Error loading debriefing file: ${e.message}`);
+    show(`
+      <div class="info-container">
+        ${defaultDebriefHTML}
+        <div class="button-container">
+          <button id="finish_btn">Finish</button>
+        </div>
+      </div>
+    `);
+  }
+  
+  // Wait for the participant to click finish
+  await new Promise(resolve => {
+    document.getElementById('finish_btn').onclick = resolve;
+  });
+  
+  // Final thank you message
+  show(`
+    <div class="message-container">
+      <h2>Thank You!</h2>
+      <p>Your participation is complete. You may now close this window and return to Prolific.</p>
+    </div>
+  `);
+}
+
 function finishExperiment(){ 
   const csv = toCSV(state.data);
   const filename  = `${CONFIG.experimentName.replace(/\s+/g, '_')}_${state.prolificID}_${state.participantHeadlineType}_${new Date().toISOString().slice(0,10)}.csv`;
@@ -1078,7 +1139,8 @@ function finishExperiment(){
     })
     .then(result => {
       console.log('Upload successful:', result);
-      show('<div class="message-container"><h2>Experiment Complete!</h2><p>Thank you for your participation. Your data has been successfully uploaded. You may now close this window and return to Prolific.</p></div>');
+      // After successful data upload, show the debriefing
+      showDebriefing();
     })
     .catch(err => {
       console.error('Data upload failed:', err);
@@ -1090,9 +1152,10 @@ function finishExperiment(){
                 <p><b>Please ensure you send this downloaded file ('${filename}') to the researcher.</b></p>
                 <p>Click the button below if the download doesn't start automatically.</p>
                 <button id="manualDownloadBtn">Download Data Manually</button>
-                <p>You may close this window after the download is complete.</p>
+                <button id="continue_to_debrief">Continue to Debriefing</button>
               </div>`);
         document.getElementById('manualDownloadBtn').onclick = () => downloadCSV(csv, filename);
+        document.getElementById('continue_to_debrief').onclick = () => showDebriefing();
         downloadCSV(csv, filename); 
       } else {
         show(`<div class="message-container">
@@ -1100,7 +1163,9 @@ function finishExperiment(){
                 <p class="error-text">Sorry, your data could not be saved due to a network error, and local download is disabled.</p>
                 <p>Please take a screenshot of this page (including any console errors if possible - Ctrl+Shift+J or Cmd+Opt+J) and contact the researcher.</p>
                 <p>Error details: ${err.message}</p>
+                <button id="continue_to_debrief">Continue to Debriefing</button>
               </div>`);
+        document.getElementById('continue_to_debrief').onclick = () => showDebriefing();
       }
     });
 }
