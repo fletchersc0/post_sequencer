@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Debriefing Statement – Sensational headlines affect evidence accumulation during veracity decisions and exacerbate polarization</title>
+  <style>
+    body{font-family:Arial,Helvetica,sans-serif;line-height:1.6;margin:0;padding:2rem;background:#fff;color:#000;}
+    h1,h2,h3{color:#003366;margin-top:1.5rem;}
+    table{width:100%;border-collapse:collapse;margin:1rem 0;}
+    table,th,td{border:1px solid #666;}
+    th,td{padding:.5rem;text-align:left;vertical-align:top;}
+    ul{margin-left:1.5rem;}
+    footer{font-size:.8rem;margin-top:2rem;}
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Debriefing Statement</h1>
+    <p><strong>Title:</strong> Sensational headlines affect evidence accumulation during veracity decisions and exacerbate polarization</p>
+    <p><strong>Chief Investigators&nbsp;/ Senior Supervisors:</strong> Dr&nbsp;Lauren&nbsp;Saling&nbsp;&amp;&nbsp;Dr&nbsp;Damiano&nbsp;Spina</p>
+    <p><strong>Principal Research Student:</strong> Fletcher&nbsp;Scott</p>
+  </header>
+
+  <main>
+    <h2>1. Thank you for participating</h2>
+    <p>The research team sincerely thanks you for taking part in this project.</p>
+
+    <h2>2. What was this study about?</h2>
+    <p>You were asked to decide whether a series of news headlines were true or false. The purpose of the research is to examine how headline wording might influence the way people judge the truth of information. Emotional cues in sensational headlines can make us more likely to accept and share content that aligns with our existing views, even when it is inaccurate. By investigating the shortcuts people use when encountering different headline styles, this project aims to understand why such content can contribute to biased information consumption and political polarisation.</p>
+
+    <h2>3. Your experimental condition</h2>
+    <p>You were in the <strong>control group</strong>, meaning you viewed headlines expressed in a neutral tone. Each headline was phrased in a straightforward, factual style without sensational or curiosity-inducing language. These neutral headlines provide a baseline for comparing how clickbait phrasing in another condition might affect the speed or confidence with which people judge truth.</p>
+
+    <h2>4. Fact-checking sheet</h2>
+    <p>It is important that you do not leave the study believing any false statements. To address this, a fact-checking sheet lists the correct factual status of every headline you saw. Please review it to clarify any misconceptions that may have arisen during the task.</p>
+
+    <h2>5. Support resources</h2>
+    <p>If any questions or topics raised in this study have negatively affected your mood, self-esteem or psychological state, please contact your GP or use the resources below:</p>
+
+    <h3>Australia</h3>
+    <table>
+      <tr><th>Service</th><th>Telephone</th><th>Website</th></tr>
+      <tr><td>Beyond Blue</td><td>1300&nbsp;224&nbsp;636</td><td><a href="https://www.beyondblue.org.au" target="_blank" rel="noopener">beyondblue.org.au</a></td></tr>
+      <tr><td>Headspace</td><td>1800&nbsp;650&nbsp;890</td><td><a href="https://headspace.org.au" target="_blank" rel="noopener">headspace.org.au</a></td></tr>
+    </table>
+
+    <h3>Global</h3>
+    <ul>
+      <li><a href="https://letstalkaboutmentalhealth.com.au" target="_blank" rel="noopener">Let’s Talk About Mental Health</a></li>
+    </ul>
+
+    <h2>6. Ethics approval and complaints</h2>
+    <p>This research was approved by the RMIT University Human Research Ethics Committee (<em>HREC ethics number here</em>). If you have any concerns about this project, please contact:</p>
+    <table>
+      <tr><th>HREC Secretary</th><td>Pascal Bernard</td></tr>
+      <tr><th>Email</th><td><a href="mailto:humanethics@rmit.edu.au">humanethics@rmit.edu.au</a></td></tr>
+      <tr><th>Telephone</th><td>+61&nbsp;3&nbsp;9925&nbsp;1985</td></tr>
+      <tr><th>Mailing address</th><td>Manager, Research Governance and Ethics<br>RMIT University<br>GPO Box 2476<br>Melbourne VIC 3001</td></tr>
+    </table>
+  </main>
+
+  <footer>
+    <p>Debriefing Statement – 09/07/2025</p>
+  </footer>
+</body>
+</html>
