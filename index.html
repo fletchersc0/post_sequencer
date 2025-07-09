@@ -118,6 +118,47 @@
       background: #3a3a3a;
       transform: translateX(5px);
     }
+    /* Slider styles for political orientation questions */
+    .slider-container {
+      width: 100%;
+      max-width: 480px;
+      margin: 1em auto;
+    }
+    .slider-labels {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.9rem;
+      margin-top: 0.5em;
+    }
+    input[type=range] {
+      -webkit-appearance: none;
+      width: 100%;
+      height: 8px;
+      border-radius: 5px;
+      background: #444;
+      outline: none;
+      opacity: 0.7;
+      -webkit-transition: .2s;
+      transition: opacity .2s;
+      margin: 1em 0;
+    }
+    input[type=range]:hover { opacity: 1; }
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: #0866ff;
+      cursor: pointer;
+    }
+    input[type=range]::-moz-range-thumb {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: #0866ff;
+      cursor: pointer;
+    }
   </style>
 </head>
 <body>
@@ -125,7 +166,7 @@
 
 <script>
 // -------------------- CONFIG --------------------
-// Current Date and Time (UTC - YYYY-MM-DD HH:MM:SS formatted): 2025-07-09 06:12:12
+// Current Date and Time (UTC - YYYY-MM-DD HH:MM:SS formatted): 2025-07-09 06:32:43
 // Current User's Login: fletchersc0
 
 const CONFIG = {
@@ -138,6 +179,9 @@ const CONFIG = {
   },
   dataPipeID             : 'qWHxwr6D720q', 
   fallbackDownload       : true, 
+  
+  // Moderate range definition for political orientation
+  moderateRange          : { min: 40, max: 60 }, // Values between 40-60 are considered moderate
   
   fixationCrossDuration  : 500,
   statementTimeoutDuration: 15000,
@@ -208,6 +252,8 @@ const CONFIG = {
     'response', 'accuracy', 'rt_ms',
     'avg_favorability', // Added new column for data export
     'age', 'gender', 'education', // Added demographic variables
+    'partisanship_q1', 'partisanship_q2', 'partisanship_q3', 'partisanship_q4', 'partisanship_q5', 'partisanship_q6_orientation', // Added political orientation questions
+    'is_moderate', 'congruence_assignment_basis', // Added fields for tracking moderate status and assignment basis
     'timestamp'
   ]
 };
@@ -223,6 +269,19 @@ const state = {
   age                     : null,
   gender                  : '',
   education               : '',
+  
+  // Added political orientation questionnaire variables
+  partisanship_q1         : null,
+  partisanship_q2         : null,
+  partisanship_q3         : null,
+  partisanship_q4         : null,
+  partisanship_q5         : null,
+  partisanship_q6_orientation : null,
+  
+  // Added moderate tracking
+  isModerate              : false,
+  congruenceAssignmentBasis : '', // Will record how congruence was determined (direct, random)
+  moderateCongruenceDirection : null, // For moderates: randomly assigned direction for congruence (Left/Right)
   
   allStimuli              : [], 
   practiceStimuli         : [], 
@@ -282,6 +341,18 @@ function log(dataRow) {
   dataRow.age = state.age;
   dataRow.gender = state.gender;
   dataRow.education = state.education;
+  
+  // Add political orientation questionnaire data to every row
+  dataRow.partisanship_q1 = state.partisanship_q1;
+  dataRow.partisanship_q2 = state.partisanship_q2;
+  dataRow.partisanship_q3 = state.partisanship_q3;
+  dataRow.partisanship_q4 = state.partisanship_q4;
+  dataRow.partisanship_q5 = state.partisanship_q5;
+  dataRow.partisanship_q6_orientation = state.partisanship_q6_orientation;
+  
+  // Add moderate status tracking
+  dataRow.is_moderate = state.isModerate ? 1 : 0;
+  dataRow.congruence_assignment_basis = state.congruenceAssignmentBasis;
   
   const completeRow = {};
   CONFIG.masterHeader.forEach(header => {
@@ -614,7 +685,7 @@ function waitKeysOrTimeout(validKeys, timeoutMs) {
   });
 }
 
-// ------------------- STIMULUS PREPARATION (MODIFIED TO USE RANDOMLY ASSIGNED HEADLINE TYPE) -------------------
+// ------------------- STIMULUS PREPARATION (MODIFIED TO HANDLE MODERATES) -------------------
 function prepareExperimentTrials() {
     if (state.allStimuli.length === 0) {
         throw new Error("No stimuli loaded. Cannot prepare trials.");
@@ -641,8 +712,18 @@ function prepareExperimentTrials() {
     
     headlineTypeFilteredStimuli.forEach(stim => {
         let congruence;
+        
+        // Handle congruence differently based on moderate status
         if (stim.partisan_alignment === 'Neutral' || !stim.partisan_alignment) { 
+            // For neutral stimuli, random assignment regardless of participant orientation
             congruence = Math.random() < 0.5 ? 'Congruent' : 'Incongruent'; 
+        } else if (state.isModerate) {
+            // For moderates, use the randomly pre-assigned direction for congruence
+            if (state.moderateCongruenceDirection === 'Left') {
+                congruence = stim.partisan_alignment === 'Left' ? 'Congruent' : 'Incongruent';
+            } else { // Right
+                congruence = stim.partisan_alignment === 'Right' ? 'Congruent' : 'Incongruent';
+            }
         } else if (state.politicalOrientation === 'Left-leaning') {
             congruence = stim.partisan_alignment === 'Left' ? 'Congruent' : 'Incongruent';
         } else if (state.politicalOrientation === 'Right-leaning') {
@@ -661,6 +742,12 @@ function prepareExperimentTrials() {
     // Store total main trials count
     state.totalMainTrials = state.mainExperimentStimuli.length;
     console.log(`Prepared ${state.totalMainTrials} main trials for headline type: ${state.participantHeadlineType}`);
+    
+    // Log congruence assignment basis for debugging
+    console.log(`Congruence assigned based on: ${state.congruenceAssignmentBasis}`);
+    if (state.isModerate) {
+        console.log(`Moderate participant assigned ${state.moderateCongruenceDirection}-leaning for congruence purposes`);
+    }
 }
 
 // ------------------- INTRO SCREEN (MODIFIED TO CONTINUE TO DEMOGRAPHICS) -------------------
@@ -692,7 +779,7 @@ async function introScreen(){
   });
 }
 
-// ------------------- DEMOGRAPHICS SCREEN (REMOVED HEADLINE TYPE SELECTION) -------------------
+// ------------------- DEMOGRAPHICS SCREEN (UPDATED WITH POLITICAL ORIENTATION QUESTIONNAIRE) -------------------
 async function runDemographics() {
   // 1. Age question
   show(`
@@ -762,7 +849,7 @@ async function runDemographics() {
     };
   });
   
-  // 3. Education question - updated with requested options
+  // 3. Education question
   show(`
     <div class="questionnaire-container">
       <p class="question-text">What is your highest level of education?</p>
@@ -793,30 +880,81 @@ async function runDemographics() {
     };
   });
   
-  // 4. Political orientation
+  // 4. Political Orientation Questionnaire (5 questions + direct orientation)
+  // Define the five political alignment questions
+  const partisanshipQuestions = [
+    { id: 'partisanship_q1', text: 'I am politically more in line with the Democrat party than the Republican party.' },
+    { id: 'partisanship_q2', text: 'In any election, given a choice between a Republican and a Democrat candidate, I will select the Republican over the Democrat candidate.' },
+    { id: 'partisanship_q3', text: 'I cannot see myself ever voting to elect Republican candidates.' },
+    { id: 'partisanship_q4', text: 'The major national media are too protective of the Democrat party for my taste.' },
+    { id: 'partisanship_q5', text: 'On balance, I lean politically more to the left (Democrat) than to the right (Republican).' }
+  ];
+
+  // First present the five political alignment questions
+  for (const q of partisanshipQuestions) {
+    show(`
+      <div class="questionnaire-container">
+        <p class="question-text">${q.text}</p>
+        <div class="slider-container">
+          <input type="range" id="q_slider" min="0" max="100" value="50">
+          <div class="slider-labels">
+            <span>Strongly Disagree</span>
+            <span>Strongly Agree</span>
+          </div>
+        </div>
+        <button id="q_next">Next</button>
+      </div>
+    `);
+    
+    await new Promise(resolve => {
+      document.getElementById('q_next').onclick = () => {
+        state[q.id] = document.getElementById('q_slider').value;
+        resolve();
+      };
+    });
+  }
+
+  // Then present the direct political orientation question
   show(`
     <div class="questionnaire-container">
-      <p class="question-text">Please select your political orientation:</p>
-      <select id="political_select">
-        <option value="" disabled selected>Select an option</option>
-        <option value="Left-leaning">Left-leaning</option>
-        <option value="Right-leaning">Right-leaning</option>
-      </select>
-      <button id="next_btn">Next</button>
+      <p class="question-text">Using the slider below, please indicate your political orientation.</p>
+      <div class="slider-container">
+        <input type="range" id="q_slider" min="0" max="100" value="50">
+        <div class="slider-labels">
+          <span>Lean Democrat</span>
+          <span>Lean Republican</span>
+        </div>
+      </div>
+      <button id="q_next">Next</button>
     </div>
   `);
   
   await new Promise(resolve => {
-    document.getElementById('next_btn').onclick = () => {
-      const politicalSelect = document.getElementById('political_select');
-      const selectedValue = politicalSelect.value;
+    document.getElementById('q_next').onclick = () => {
+      const val = parseInt(document.getElementById('q_slider').value, 10);
+      state.partisanship_q6_orientation = val;
       
-      if (!selectedValue) {
-        alert('Please select your political orientation.');
-        return;
+      // Determine political orientation based on the slider value
+      // Check if in moderate range
+      if (val >= CONFIG.moderateRange.min && val <= CONFIG.moderateRange.max) {
+        state.isModerate = true;
+        state.politicalOrientation = 'Moderate';
+        
+        // For moderates, randomly assign a direction for congruence purposes
+        state.moderateCongruenceDirection = Math.random() < 0.5 ? 'Left' : 'Right';
+        state.congruenceAssignmentBasis = 'random_assignment_for_moderate';
+        
+        console.log(`Moderate participant (${val}) - randomly assigned ${state.moderateCongruenceDirection} direction for congruence`);
+      } else if (val < 50) {
+        state.isModerate = false;
+        state.politicalOrientation = 'Left-leaning';
+        state.congruenceAssignmentBasis = 'direct_left_orientation';
+      } else {
+        state.isModerate = false;
+        state.politicalOrientation = 'Right-leaning';
+        state.congruenceAssignmentBasis = 'direct_right_orientation';
       }
       
-      state.politicalOrientation = selectedValue;
       resolve();
     };
   });
@@ -1253,7 +1391,7 @@ function finishExperiment(){
     // Then collect Prolific ID
     await introScreen();
     
-    // Then collect demographics and randomly assign headline type
+    // Then collect demographics and political orientation questionnaire
     await runDemographics();
     
     show('<h2>Preparing experiment trials...</h2>');
