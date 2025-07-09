@@ -55,7 +55,7 @@
       height:6em; 
       display:flex;align-items:center;justify-content:center;
     }
-    .stimulus-container, .message-container {
+    .stimulus-container, .message-container, .questionnaire-container {
       min-height:12em; 
       display:flex;flex-direction:column;align-items:center;justify-content:center;
       padding: 1em;
@@ -66,7 +66,11 @@
       margin-bottom: 1em;
       max-width: 90%; 
     }
-    .instructions-text, .message-text { font-size:1.1rem; line-height:1.6; margin-bottom:1em;}
+    .instructions-text, .message-text, .question-text { 
+      font-size:1.1rem; 
+      line-height:1.6; 
+      margin-bottom:1em;
+    }
     .key-reminder { 
       font-size:1rem; 
       color: #ccc; 
@@ -165,6 +169,7 @@ const CONFIG = {
     'is_practice_trial', 'is_attention_check',
     'response', 'accuracy', 'rt_ms',
     'avg_favorability', // Added new column for data export
+    'age', 'gender', 'education', // Added demographic variables
     'timestamp'
   ]
 };
@@ -175,6 +180,11 @@ const state = {
   politicalOrientation    : '',
   participantHeadlineType : '',
   keyAssignment           : '', // Will store which key is assigned to "true"
+  
+  // Added demographic variables to state
+  age                     : null,
+  gender                  : '',
+  education               : '',
   
   allStimuli              : [], 
   practiceStimuli         : [], 
@@ -229,6 +239,11 @@ function log(dataRow) {
   dataRow.timestamp = new Date().toISOString();
   // Add key assignment to every row
   dataRow.key_assignment = state.keyAssignment;
+  
+  // Add demographic data to every row
+  dataRow.age = state.age;
+  dataRow.gender = state.gender;
+  dataRow.education = state.education;
   
   const completeRow = {};
   CONFIG.masterHeader.forEach(header => {
@@ -467,49 +482,197 @@ function prepareExperimentTrials() {
     console.log(`Prepared ${state.totalMainTrials} main trials for headline type: ${state.participantHeadlineType}`);
 }
 
-
-// ------------------- INTRO SCREEN (KEEPS HEADLINE TYPE SELECTION) -------------------
+// ------------------- INTRO SCREEN (MODIFIED TO CONTINUE TO DEMOGRAPHICS) -------------------
 async function introScreen(){
   show(`
     <div class="message-container">
       <h1>${CONFIG.experimentName}</h1>
       <p class="instructions-text">Welcome! In this study, you will be shown a series of statements. 
       For each statement, please indicate whether you believe it is TRUE or FALSE as quickly and accurately as possible.</p>
+      <p class="instructions-text">This task includes approximately 64 statements and will take about 15-20 minutes to complete.</p>
       
       <label class="input-label" for="prolificID">Please enter your Prolific ID:</label>
       <input type="text" id="prolificID" placeholder="Prolific ID" />
       
-      <label class="input-label" for="politicalOrientation">Please select your political orientation:</label>
-      <select id="politicalOrientation">
-        <option value="">-- Select --</option>
-        <option value="Left-leaning">Left-leaning</option>
-        <option value="Right-leaning">Right-leaning</option>
-      </select>
-
-      <label class="input-label" for="participantHeadlineType">Please select your headline type focus for this session:</label>
-      <select id="participantHeadlineType">
-        <option value="">-- Select --</option>
-        <option value="Clickbait">Clickbait Headlines</option>
-        <option value="Not Clickbait">Non-Clickbait Headlines</option>
-      </select>
       <br><br>
-      <button id="startBtn">Start Experiment</button>
+      <button id="startBtn">Continue</button>
     </div>
   `);
 
   return new Promise(resolve => {
     document.getElementById('startBtn').onclick = () => {
       const pid = document.getElementById('prolificID').value.trim();
-      const orientation = document.getElementById('politicalOrientation').value;
-      const headlineType = document.getElementById('participantHeadlineType').value;
 
       if (!pid) { alert('Please enter your Prolific ID.'); return; }
-      if (!orientation) { alert('Please select your political orientation.'); return; }
-      if (!headlineType) { alert('Please select your headline type focus.'); return; }
       
       state.prolificID = pid;
-      state.politicalOrientation = orientation;
-      state.participantHeadlineType = headlineType; // Store the selected headline type
+      resolve();
+    };
+  });
+}
+
+// ------------------- NEW DEMOGRAPHICS SCREEN -------------------
+async function runDemographics() {
+  // 1. Age question
+  show(`
+    <div class="questionnaire-container">
+      <h2>Demographics</h2>
+      <p class="question-text">Please enter your age:</p>
+      <input type="number" id="age_input" min="18" max="120" placeholder="Age" />
+      <button id="next_btn">Next</button>
+    </div>
+  `);
+  
+  await new Promise(resolve => {
+    document.getElementById('next_btn').onclick = () => {
+      const ageInput = document.getElementById('age_input').value.trim();
+      const age = parseInt(ageInput);
+      
+      if (!ageInput || isNaN(age) || age < 18 || age > 120) {
+        alert('Please enter a valid age between 18 and 120.');
+        return;
+      }
+      
+      state.age = age;
+      resolve();
+    };
+  });
+  
+  // 2. Gender question
+  show(`
+    <div class="questionnaire-container">
+      <h2>Demographics</h2>
+      <p class="question-text">Please select your gender:</p>
+      <select id="gender_select">
+        <option value="" disabled selected>Select an option</option>
+        <option value="male">Male</option>
+        <option value="female">Female</option>
+        <option value="non-binary">Non-binary/third gender</option>
+        <option value="prefer-not-to-say">Prefer not to say</option>
+        <option value="other">Other</option>
+      </select>
+      <input type="text" id="gender_other" style="display:none;" placeholder="Please specify" />
+      <button id="next_btn">Next</button>
+    </div>
+  `);
+  
+  // Show/hide the "other" text field based on selection
+  document.getElementById('gender_select').addEventListener('change', function() {
+    const otherField = document.getElementById('gender_other');
+    otherField.style.display = this.value === 'other' ? 'block' : 'none';
+  });
+  
+  await new Promise(resolve => {
+    document.getElementById('next_btn').onclick = () => {
+      const genderSelect = document.getElementById('gender_select');
+      const genderOther = document.getElementById('gender_other');
+      const selectedValue = genderSelect.value;
+      
+      if (!selectedValue) {
+        alert('Please select your gender.');
+        return;
+      }
+      
+      if (selectedValue === 'other' && !genderOther.value.trim()) {
+        alert('Please specify your gender.');
+        return;
+      }
+      
+      state.gender = selectedValue === 'other' ? `other: ${genderOther.value.trim()}` : selectedValue;
+      resolve();
+    };
+  });
+  
+  // 3. Education question
+  show(`
+    <div class="questionnaire-container">
+      <h2>Demographics</h2>
+      <p class="question-text">What is your highest level of education?</p>
+      <select id="education_select">
+        <option value="" disabled selected>Select an option</option>
+        <option value="less-than-high-school">Less than high school</option>
+        <option value="high-school">High school graduate</option>
+        <option value="some-college">Some college</option>
+        <option value="associate">Associate degree</option>
+        <option value="bachelor">Bachelor's degree</option>
+        <option value="master">Master's degree</option>
+        <option value="doctorate">Doctorate degree</option>
+        <option value="professional">Professional degree</option>
+        <option value="prefer-not-to-say">Prefer not to say</option>
+      </select>
+      <button id="next_btn">Next</button>
+    </div>
+  `);
+  
+  await new Promise(resolve => {
+    document.getElementById('next_btn').onclick = () => {
+      const educationSelect = document.getElementById('education_select');
+      const selectedValue = educationSelect.value;
+      
+      if (!selectedValue) {
+        alert('Please select your education level.');
+        return;
+      }
+      
+      state.education = selectedValue;
+      resolve();
+    };
+  });
+  
+  // 4. Political orientation (moved from intro screen)
+  show(`
+    <div class="questionnaire-container">
+      <h2>Political Orientation</h2>
+      <p class="question-text">Please select your political orientation:</p>
+      <select id="political_select">
+        <option value="" disabled selected>Select an option</option>
+        <option value="Left-leaning">Left-leaning</option>
+        <option value="Right-leaning">Right-leaning</option>
+      </select>
+      <button id="next_btn">Next</button>
+    </div>
+  `);
+  
+  await new Promise(resolve => {
+    document.getElementById('next_btn').onclick = () => {
+      const politicalSelect = document.getElementById('political_select');
+      const selectedValue = politicalSelect.value;
+      
+      if (!selectedValue) {
+        alert('Please select your political orientation.');
+        return;
+      }
+      
+      state.politicalOrientation = selectedValue;
+      resolve();
+    };
+  });
+  
+  // 5. Headline type selection
+  show(`
+    <div class="questionnaire-container">
+      <h2>Headline Type</h2>
+      <p class="question-text">Please select your headline type focus for this session:</p>
+      <select id="headline_select">
+        <option value="" disabled selected>Select an option</option>
+        <option value="Clickbait">Clickbait Headlines</option>
+        <option value="Not Clickbait">Non-Clickbait Headlines</option>
+      </select>
+      <button id="next_btn">Next</button>
+    </div>
+  `);
+  
+  await new Promise(resolve => {
+    document.getElementById('next_btn').onclick = () => {
+      const headlineSelect = document.getElementById('headline_select');
+      const selectedValue = headlineSelect.value;
+      
+      if (!selectedValue) {
+        alert('Please select your headline type focus.');
+        return;
+      }
+      
+      state.participantHeadlineType = selectedValue;
       resolve();
     };
   });
@@ -537,6 +700,8 @@ async function showInstructionsScreen() {
                 <br><br>
                 There will be a short practice session first. 
                 During the main experiment, there will be no feedback, and there will be short breaks every 16 trials.
+                <br><br>
+                <strong>Important:</strong> In this experiment, you will see approximately 64 ${state.participantHeadlineType} headlines.
             </p>
             <button id="startPracticeBtn">Start Practice</button>
         </div>
@@ -839,7 +1004,8 @@ function finishExperiment(){
     show('<h2>Loading experiment configuration...</h2>');
     await loadCSVStimuli(); 
     
-    await introScreen(); // Collects Prolific ID, political orientation, AND headline type
+    await introScreen(); // Collect Prolific ID
+    await runDemographics(); // Collect demographics, political orientation, and headline type
     
     show('<h2>Preparing experiment trials...</h2>');
     prepareExperimentTrials(); // Now includes all statements of chosen headline type
