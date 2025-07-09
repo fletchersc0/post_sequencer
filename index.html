@@ -98,17 +98,12 @@
       font-size: 1.2rem;
       margin: 1em 0;
     }
-    /* Styles for Debriefing Screen, adapted from the first example */
-    .debrief-content {
-      height: 300px;
-      overflow-y: scroll;
-      border: 1px solid var(--border-color);
-      padding: 1rem;
-      text-align: left;
-      margin-bottom: 1rem;
-      background: var(--input-bg);
+    #countdown {
+      font-weight: bold;
+      font-size: 1.2rem;
+      color: var(--warning-color);
+      margin-top: 1em;
     }
-    .button-bar { margin-top: 1.5rem; text-align: center; }
   </style>
 </head>
 <body>
@@ -116,36 +111,75 @@
 
 <script>
 // -------------------- CONFIG --------------------
+// Current Date and Time (UTC - YYYY-MM-DD HH:MM:SS formatted): 2025-07-09 06:05:12
+// Current User's Login: fletchersc0
+
 const CONFIG = {
   experimentName         : 'Political Truth Judgment Task (Complete Statement Set)',
   csvFile                : 'stimulus_master.csv', 
+  // Response keys will be assigned randomly at startup
   responseKeys           : { 
-    true_key: null,
-    false_key: null,
+    true_key: null,  // Will be assigned 'q' or 'p' 
+    false_key: null, // Will be assigned the other key
   },
   dataPipeID             : 'qWHxwr6D720q', 
   fallbackDownload       : true, 
   
-  // ★ ADDED: Prolific URL for completion link
-  prolificURL            : 'https://app.prolific.co/submissions/complete?cc=YOUR_CODE_HERE', // <-- ❗REPLACE with your actual Prolific completion code
-
   fixationCrossDuration  : 500,
   statementTimeoutDuration: 15000,
   itiMinDuration         : 500,
   itiMaxDuration         : 1000,
   
   numPracticeTrials      : 4,
-  trialsPerBreak         : 16,
+  trialsPerBreak         : 16, // Break every 16 statements (reasonable for 64 total)
 
+  // headline types, truthValues, congruenceLevels for structure definition
   headlineTypes          : ['Clickbait', 'Not Clickbait'],
   truthValues            : ['True', 'False'], 
   congruenceLevels       : ['Congruent', 'Incongruent'],
 
+  // Predefined practice trials - obvious facts and myths
   practiceTrials         : [
-    { statement_id: 'practice_fact_1', statement_text: 'Water freezes at 0 degrees Celsius at standard atmospheric pressure.', headline_type: 'Not Clickbait', truth_value: true, partisan_alignment: 'Neutral', is_practice_stimulus: true, is_attention_check: false, partisan_congruence: 'Neutral' },
-    { statement_id: 'practice_fact_2', statement_text: 'The Earth orbits around the Sun, completing one orbit approximately every 365 days.', headline_type: 'Not Clickbait', truth_value: true, partisan_alignment: 'Neutral', is_practice_stimulus: true, is_attention_check: false, partisan_congruence: 'Neutral' },
-    { statement_id: 'practice_myth_1', statement_text: 'Humans only use 10% of their brains in daily life.', headline_type: 'Clickbait', truth_value: false, partisan_alignment: 'Neutral', is_practice_stimulus: true, is_attention_check: false, partisan_congruence: 'Neutral' },
-    { statement_id: 'practice_myth_2', statement_text: 'The Great Wall of China is the only human-made structure visible from the Moon with the naked eye.', headline_type: 'Clickbait', truth_value: false, partisan_alignment: 'Neutral', is_practice_stimulus: true, is_attention_check: false, partisan_congruence: 'Neutral' }
+    {
+      statement_id: 'practice_fact_1',
+      statement_text: 'Water freezes at 0 degrees Celsius at standard atmospheric pressure.',
+      headline_type: 'Not Clickbait',
+      truth_value: true,
+      partisan_alignment: 'Neutral',
+      is_practice_stimulus: true,
+      is_attention_check: false,
+      partisan_congruence: 'Neutral'
+    },
+    {
+      statement_id: 'practice_fact_2',
+      statement_text: 'The Earth orbits around the Sun, completing one orbit approximately every 365 days.',
+      headline_type: 'Not Clickbait',
+      truth_value: true,
+      partisan_alignment: 'Neutral',
+      is_practice_stimulus: true,
+      is_attention_check: false,
+      partisan_congruence: 'Neutral'
+    },
+    {
+      statement_id: 'practice_myth_1',
+      statement_text: 'Humans only use 10% of their brains in daily life.',
+      headline_type: 'Clickbait',
+      truth_value: false,
+      partisan_alignment: 'Neutral',
+      is_practice_stimulus: true,
+      is_attention_check: false,
+      partisan_congruence: 'Neutral'
+    },
+    {
+      statement_id: 'practice_myth_2',
+      statement_text: 'The Great Wall of China is the only human-made structure visible from the Moon with the naked eye.',
+      headline_type: 'Clickbait',
+      truth_value: false,
+      partisan_alignment: 'Neutral',
+      is_practice_stimulus: true,
+      is_attention_check: false,
+      partisan_congruence: 'Neutral'
+    }
   ],
 
   masterHeader : [ 
@@ -155,7 +189,9 @@ const CONFIG = {
     'headline_type', 'truth_value_stimulus', 'partisan_alignment_stimulus', 'partisan_congruence',
     'is_practice_trial', 'is_attention_check',
     'response', 'accuracy', 'rt_ms',
-    'avg_favorability', 'age', 'gender', 'education', 'timestamp'
+    'avg_favorability', // Added new column for data export
+    'age', 'gender', 'education', // Added demographic variables
+    'timestamp'
   ]
 };
 
@@ -163,11 +199,14 @@ const CONFIG = {
 const state = {
   prolificID              : '',
   politicalOrientation    : '',
-  participantHeadlineType : '',
-  keyAssignment           : '',
+  participantHeadlineType : '', // Will be randomly assigned after demographics
+  keyAssignment           : '', // Will store which key is assigned to "true"
+  
+  // Added demographic variables to state
   age                     : null,
   gender                  : '',
   education               : '',
+  
   allStimuli              : [], 
   practiceStimuli         : [], 
   mainExperimentStimuli   : [],
@@ -181,8 +220,11 @@ const state = {
 const stage = document.getElementById('stage');
 let rtClock = 0;
 
+// Randomize response key assignment at startup
 function assignResponseKeys() {
+  // Randomly decide if 'q' means true (50% chance)
   const qIsTrue = Math.random() < 0.5;
+  
   if (qIsTrue) {
     CONFIG.responseKeys.true_key = 'q';
     CONFIG.responseKeys.false_key = 'p';
@@ -192,7 +234,11 @@ function assignResponseKeys() {
     CONFIG.responseKeys.false_key = 'q';
     state.keyAssignment = 'p=true_q=false';
   }
+  
+  console.log(`Key assignment: TRUE=${CONFIG.responseKeys.true_key}, FALSE=${CONFIG.responseKeys.false_key}`);
 }
+
+// Call this immediately to set up the key assignment
 assignResponseKeys();
 
 // ------------------------ UTILITY FUNCTIONS ------------------------
@@ -201,6 +247,7 @@ const shuffle = arr => { for(let i = arr.length - 1; i > 0; i--) { const j = Mat
 const show = html => stage.innerHTML = html;
 const getRandomInt = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
 
+// Key reminder helper function that maintains spatial layout
 function getKeyReminderHTML() {
   return `<p class="key-reminder">
     <span style="float:left; width:45%; text-align:left;">Q = ${CONFIG.responseKeys.true_key === 'q' ? 'TRUE' : 'FALSE'}</span>
@@ -211,7 +258,10 @@ function getKeyReminderHTML() {
 // ------------------------ DATA LOGGING FUNCTIONS ------------------------
 function log(dataRow) {
   dataRow.timestamp = new Date().toISOString();
+  // Add key assignment to every row
   dataRow.key_assignment = state.keyAssignment;
+  
+  // Add demographic data to every row
   dataRow.age = state.age;
   dataRow.gender = state.gender;
   dataRow.education = state.education;
@@ -223,6 +273,7 @@ function log(dataRow) {
   state.data.push(completeRow);
 }
 
+// FIXED: Modified toCSV function to handle cell formatting more consistently
 function toCSV(rows){
   if (!rows.length) return '';
   const header = CONFIG.masterHeader;
@@ -230,7 +281,7 @@ function toCSV(rows){
   rows.forEach(r => {
     const line = header.map(k => {
       let cell = (k in r && r[k] !== null && r[k] !== undefined) ? r[k] : '';
-      cell = String(cell);
+      cell = String(cell); // Removed trim() to match working version
       if (/[",\n\r]/.test(cell)) cell = '"' + cell.replace(/"/g, '""') + '"';
       return cell;
     }).join(',');
@@ -239,12 +290,26 @@ function toCSV(rows){
   return lines.join('\n');
 }
 
+// FIXED: Updated uploadCSV function with correct URL (no trailing slash)
 function uploadCSV(filename, csvData){
-  if (!CONFIG.dataPipeID) return Promise.resolve({ok: false, statusText: "DataPipeID not set"});
+  if (!CONFIG.dataPipeID || CONFIG.dataPipeID === 'YOUR_JSPSYCH_DATAPIPE_ID') {
+      console.warn("DataPipeID not set or is placeholder. Skipping upload.");
+      return Promise.resolve({ok: false, statusText: "DataPipeID not set"});
+  }
+  
+  console.log("Attempting to upload data to datapipe:", CONFIG.dataPipeID);
+  console.log("Filename:", filename);
+  console.log("Data size (bytes):", new Blob([csvData]).size);
+  
+  // FIXED: Removed trailing slash from API URL
   return fetch('https://pipe.jspsych.org/api/data', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ experimentID: CONFIG.dataPipeID, filename: filename, data: csvData })
+    body: JSON.stringify({ 
+      experimentID: CONFIG.dataPipeID, 
+      filename: filename, 
+      data: csvData 
+    })
   });
 }
 
@@ -260,66 +325,138 @@ function downloadCSV(csvData, filename){
   URL.revokeObjectURL(url);
 }
 
-// ------------------- ★ NEW/MODIFIED FUNCTIONS FOR SCREENING & DEBRIEF -------------------
-
-// ★ NEW: Function to handle automatic redirection for ineligible participants
-function exitToProlific() {
-  const message = `
-    <div class="message-container" style="text-align:center;">
-      <h2>Thank you for your interest.</h2>
-      <p>As you do not meet the eligibility criteria or do not wish to consent, you cannot proceed with the study.</p>
-      <p>You will now be returned to Prolific.</p>
-    </div>
-  `;
-  show(message);
-  setTimeout(() => {
-    window.location.href = 'https://app.prolific.com';
-  }, 5000); // 5-second delay
-}
-
-// ------------------- INFORMATION & CONSENT SCREEN (★ MODIFIED) -------------------
+// ------------------- INFORMATION & CONSENT SCREEN -------------------
 async function showInformationAndConsent() {
+  // Default information text - replace with your own participant information
   const participantInfoHTML = `
     <h2>Participant Information Sheet</h2>
-    <p>You are invited to take part in a research study...</p>
-    <!-- ... (rest of your information sheet text) ... -->
+    <p>You are invited to take part in a research study about how people judge the truthfulness of different types of headlines.</p>
+    
+    <h3>What is the purpose of the study?</h3>
+    <p>This study aims to understand how people determine whether news headlines are true or false, and how different presentation styles might influence these judgments.</p>
+    
+    <h3>What will I be asked to do?</h3>
+    <p>You will be shown a series of headlines and asked to judge whether each one is true or false as quickly and accurately as possible. The task will take approximately 15-20 minutes to complete.</p>
+    
+    <h3>Risks and benefits</h3>
+    <p>There are no known risks associated with this study. Your participation will help advance our understanding of how people evaluate information.</p>
+    
+    <h3>Data protection and confidentiality</h3>
+    <p>Your responses will be kept completely anonymous. We will collect your Prolific ID only for payment purposes. Your demographic information will not be linked to your identity.</p>
+    
+    <h3>Ethics approval</h3>
+    <p>This study has received ethical approval from [University Name] Ethics Committee.</p>
+    
+    <h3>Contact information</h3>
+    <p>If you have any questions about this research, please contact: [Researcher Email]</p>
   `;
   
-  show(`<div class="info-container">${participantInfoHTML}<div class="button-container"><button id="next_btn">Next</button></div></div>`);
-  await new Promise(resolve => { document.getElementById('next_btn').onclick = resolve; });
-
-  // ★ This is the only function that needs to be modified for the screening logic
-  async function askYesNoQuestion(questionText) {
+  // Try to load external information text file if available, otherwise use default
+  try {
+    const response = await fetch('participant_information.txt');
+    if (response.ok) {
+      const infoHtml = await response.text();
       show(`
-          <div class="questionnaire-container">
-              <p class="question-text">${questionText}</p>
-              <button id="yes_btn">Yes</button> <button id="no_btn">No</button>
-          </div>
+        <div class="info-container">
+            ${infoHtml}
+            <div class="button-container">
+                <a href="PIS.pdf" download="PIS.pdf" target="_blank" rel="noopener noreferrer" style="text-decoration: none;"><button>Download Information Sheet (PDF)</button></a>
+                <button id="next_btn">Next</button>
+            </div>
+        </div>
       `);
-      return new Promise(resolve => {
-          document.getElementById('yes_btn').onclick = () => resolve(true);
-          document.getElementById('no_btn').onclick = () => resolve(false);
-      });
+    } else {
+      // Use default information if file not found
+      show(`
+        <div class="info-container">
+            ${participantInfoHTML}
+            <div class="button-container">
+                <button id="next_btn">Next</button>
+            </div>
+        </div>
+      `);
+    }
+  } catch (e) {
+    // Use default information if there's an error
+    console.error('Failed to load participant information file:', e);
+    show(`
+      <div class="info-container">
+          ${participantInfoHTML}
+          <div class="button-container">
+              <button id="next_btn">Next</button>
+          </div>
+      </div>
+    `);
   }
 
+  await new Promise(resolve => { document.getElementById('next_btn').onclick = resolve; });
+
+  // Function to show rejection message when participant is not eligible or does not consent
+  // MODIFIED: Updated to include countdown and redirect to Prolific
+  const showRejectionMessage = () => {
+    show(`
+      <div class="questionnaire-container">
+        <p>Thank you for your interest. As you do not meet the eligibility criteria or do not wish to consent, you cannot proceed with the study.</p>
+        <p>Please return your submission on the Prolific website. You may now close this window.</p>
+        <p id="countdown">Redirecting to Prolific in 5 seconds...</p>
+      </div>
+    `);
+    
+    // Start countdown and redirect after 5 seconds
+    let secondsLeft = 5;
+    const countdownElement = document.getElementById('countdown');
+    
+    const countdownInterval = setInterval(() => {
+      secondsLeft--;
+      if (secondsLeft <= 0) {
+        clearInterval(countdownInterval);
+        window.location.href = 'https://app.prolific.com';
+      } else {
+        countdownElement.textContent = `Redirecting to Prolific in ${secondsLeft} seconds...`;
+      }
+    }, 1000);
+  };
+
   // Age verification
-  const isOver18 = await askYesNoQuestion('Are you over 18 years of age?');
+  show(`
+    <div class="questionnaire-container">
+      <p class="question-text">Are you over 18 years of age?</p>
+      <button id="yes_btn">Yes</button> <button id="no_btn">No</button>
+    </div>
+  `);
+  
+  const isOver18 = await new Promise(resolve => {
+    document.getElementById('yes_btn').onclick = () => resolve(true);
+    document.getElementById('no_btn').onclick = () => resolve(false);
+  });
+
   if (!isOver18) {
-    exitToProlific();
-    return new Promise(() => {}); // Halts execution
+    showRejectionMessage();
+    return false;
   }
 
   // Consent confirmation
-  const hasConsented = await askYesNoQuestion('Do you consent to participate in the study?');
+  show(`
+    <div class="questionnaire-container">
+      <p class="question-text">Do you consent to participate in the study?</p>
+      <button id="yes_btn">Yes</button> <button id="no_btn">No</button>
+    </div>
+  `);
+  
+  const hasConsented = await new Promise(resolve => {
+    document.getElementById('yes_btn').onclick = () => resolve(true);
+    document.getElementById('no_btn').onclick = () => resolve(false);
+  });
+
   if (!hasConsented) {
-    exitToProlific();
-    return new Promise(() => {}); // Halts execution
+    showRejectionMessage();
+    return false;
   }
 
-  return true; // Consent given, continue experiment
+  return true; // Consent given
 }
 
-// ------------------- STIMULUS LOADER -------------------
+// ------------------- STIMULUS LOADER (MODIFIED TO INCLUDE AVG_FAVORABILITY) -------------------
 async function loadCSVStimuli(){
   const response = await fetch(CONFIG.csvFile);
   if (!response.ok) throw new Error(`Failed to load ${CONFIG.csvFile}: ${response.statusText}`);
@@ -334,14 +471,18 @@ async function loadCSVStimuli(){
   const headerLine = lines.shift();
   const header = headerLine.split(delimiter).map(h => h.trim().replace(/^"|"$/g, '').toLowerCase());
   
+  // Log the actual headers found for debugging
+  console.log("CSV Headers found:", header);
+
+  // Updated expected CSV headers including avg_favorability
   const expectedCsvHeaders = ['item', 'claim', 'clickbait', 'veracity', 'favorability'];
   for (const reqHeader of expectedCsvHeaders) {
       if (!header.includes(reqHeader)) {
-          throw new Error(`CSV file is missing required header: '${reqHeader}'.`);
+          throw new Error(`CSV file is missing required header: '${reqHeader}'. Found headers: ${header.join(', ')}`);
       }
   }
   
-  lines.forEach((line) => {
+  lines.forEach((line, index) => {
     if (line.trim() === "") return; 
 
     let fields = [];
@@ -349,9 +490,13 @@ async function loadCSVStimuli(){
         let current = '', inQuotes = false;
         for (let i = 0; i < line.length; i++) {
             const char = line[i];
-            if (char === '"' && (i === 0 || line[i-1] !== '\\')) inQuotes = !inQuotes;
-            else if (char === delimiter && !inQuotes) { fields.push(current.trim().replace(/^"|"$/g, '')); current = ''; }
-            else current += char;
+            if (char === '"' && (i === 0 || line[i-1] !== '\\')) { 
+                inQuotes = !inQuotes;
+            } else if (char === delimiter && !inQuotes) {
+                fields.push(current.trim().replace(/^"|"$/g, '')); current = '';
+            } else {
+                current += char;
+            }
         }
         fields.push(current.trim().replace(/^"|"$/g, ''));
     } else { 
@@ -362,21 +507,64 @@ async function loadCSVStimuli(){
     header.forEach((h, i) => rawStim[h] = (fields[i] !== undefined ? fields[i] : '').trim());
 
     const itemNum = rawStim.item;
-    if (!itemNum) return;
+    if (!itemNum) {
+        console.warn(`Skipping CSV row ${index + 2} due to missing 'Item' number.`);
+        return;
+    }
 
     const truthValue = rawStim.veracity.toUpperCase() === 'TRUE';
-    let partisanAlignment = 'Neutral';
-    if (rawStim.favorability.toLowerCase() === 'republican') partisanAlignment = 'Right';
-    else if (rawStim.favorability.toLowerCase() === 'democrat') partisanAlignment = 'Left';
+    let partisanAlignment;
+    if (rawStim.favorability.toLowerCase() === 'republican') {
+        partisanAlignment = 'Right';
+    } else if (rawStim.favorability.toLowerCase() === 'democrat') {
+        partisanAlignment = 'Left';
+    } else {
+        console.warn(`Unknown favorability '${rawStim.favorability}' for Item ${itemNum}. Defaulting to Neutral/Undefined.`);
+        partisanAlignment = 'Neutral'; 
+    }
 
+    // Capture avg_favorability if it exists in the CSV
     const avgFavorability = rawStim.avg_favorability || '';
 
-    if (rawStim.clickbait) state.allStimuli.push({ statement_id: `item${itemNum}_clickbait`, statement_text: rawStim.clickbait, headline_type: 'Clickbait', truth_value: truthValue, partisan_alignment: partisanAlignment, avg_favorability: avgFavorability, is_practice_stimulus: false, is_attention_check: false });
-    if (rawStim.claim) state.allStimuli.push({ statement_id: `item${itemNum}_notclickbait`, statement_text: rawStim.claim, headline_type: 'Not Clickbait', truth_value: truthValue, partisan_alignment: partisanAlignment, avg_favorability: avgFavorability, is_practice_stimulus: false, is_attention_check: false });
+    // Process both clickbait and non-clickbait versions
+    // For clickbait version
+    if (rawStim.clickbait) {
+        state.allStimuli.push({
+            statement_id: `item${itemNum}_clickbait`,
+            statement_text: rawStim.clickbait,
+            headline_type: 'Clickbait', 
+            truth_value: truthValue,
+            partisan_alignment: partisanAlignment,
+            avg_favorability: avgFavorability, // Store avg_favorability
+            is_practice_stimulus: false, 
+            is_attention_check: false,   
+        });
+    } else {
+        console.warn(`Missing 'clickbait' statement for Item ${itemNum}.`);
+    }
+    
+    // For non-clickbait version (using claim)
+    if (rawStim.claim) {
+        state.allStimuli.push({
+            statement_id: `item${itemNum}_notclickbait`,
+            statement_text: rawStim.claim,
+            headline_type: 'Not Clickbait', 
+            truth_value: truthValue,
+            partisan_alignment: partisanAlignment,
+            avg_favorability: avgFavorability, // Store avg_favorability
+            is_practice_stimulus: false, 
+            is_attention_check: false,   
+        });
+    } else {
+        console.warn(`Missing 'claim' statement for Item ${itemNum}.`);
+    }
   });
+  
+  // Log the total number of stimuli loaded
+  console.log(`Total stimuli loaded: ${state.allStimuli.length}`);
 }
 
-// ------------------- KEYBOARD HELPERS -------------------
+// ------------------- KEYBOARD HELPERS (MODIFIED FOR Q/P KEYS) -------------------
 function waitKeys(validKeys) {
   return new Promise(resolve => {
     function onKey(e) {
@@ -409,39 +597,67 @@ function waitKeysOrTimeout(validKeys, timeoutMs) {
   });
 }
 
-// ------------------- STIMULUS PREPARATION -------------------
+// ------------------- STIMULUS PREPARATION (MODIFIED TO USE RANDOMLY ASSIGNED HEADLINE TYPE) -------------------
 function prepareExperimentTrials() {
-    if (state.allStimuli.length === 0) throw new Error("No stimuli loaded.");
-    if (!state.participantHeadlineType) throw new Error("Headline type not assigned.");
+    if (state.allStimuli.length === 0) {
+        throw new Error("No stimuli loaded. Cannot prepare trials.");
+    }
+    if (!state.participantHeadlineType) {
+        throw new Error("Headline type not assigned. Cannot prepare trials.");
+    }
     
-    state.practiceStimuli = shuffle([...CONFIG.practiceTrials]);
+    // 1. Use predefined practice trials
+    state.practiceStimuli = [...CONFIG.practiceTrials];
+    shuffle(state.practiceStimuli);
     
+    // 2. Filter by participant's assigned headline type (but include ALL statements of that type)
     const headlineTypeFilteredStimuli = state.allStimuli.filter(
         stim => stim.headline_type === state.participantHeadlineType
     );
-    if (headlineTypeFilteredStimuli.length === 0) throw new Error(`No stimuli found for assigned headline type.`);
     
-    state.mainExperimentStimuli = headlineTypeFilteredStimuli.map(stim => {
+    if (headlineTypeFilteredStimuli.length === 0) {
+        throw new Error(`No stimuli found for the assigned headline type: '${state.participantHeadlineType}'. Check CSV content and distribution.`);
+    }
+    
+    // 3. Assign Congruence for all stimuli based on participant's political orientation
+    state.mainExperimentStimuli = [];
+    
+    headlineTypeFilteredStimuli.forEach(stim => {
         let congruence;
-        if (stim.partisan_alignment === 'Neutral') congruence = Math.random() < 0.5 ? 'Congruent' : 'Incongruent';
-        else if (state.politicalOrientation === 'Left-leaning') congruence = stim.partisan_alignment === 'Left' ? 'Congruent' : 'Incongruent';
-        else if (state.politicalOrientation === 'Right-leaning') congruence = stim.partisan_alignment === 'Right' ? 'Congruent' : 'Incongruent';
-        else congruence = 'ErrorCongruence';
-        return {...stim, partisan_congruence: congruence};
+        if (stim.partisan_alignment === 'Neutral' || !stim.partisan_alignment) { 
+            congruence = Math.random() < 0.5 ? 'Congruent' : 'Incongruent'; 
+        } else if (state.politicalOrientation === 'Left-leaning') {
+            congruence = stim.partisan_alignment === 'Left' ? 'Congruent' : 'Incongruent';
+        } else if (state.politicalOrientation === 'Right-leaning') {
+            congruence = stim.partisan_alignment === 'Right' ? 'Congruent' : 'Incongruent';
+        } else {
+            congruence = 'ErrorCongruence'; 
+        }
+        
+        // Add all stimuli of the assigned headline type to main experiment with congruence assigned
+        state.mainExperimentStimuli.push({...stim, partisan_congruence: congruence});
     });
     
+    // 4. Shuffle all stimuli for random presentation order
     shuffle(state.mainExperimentStimuli);
+    
+    // Store total main trials count
     state.totalMainTrials = state.mainExperimentStimuli.length;
+    console.log(`Prepared ${state.totalMainTrials} main trials for headline type: ${state.participantHeadlineType}`);
 }
 
-// ------------------- INTRO & DEMOGRAPHICS -------------------
+// ------------------- INTRO SCREEN (MODIFIED TO CONTINUE TO DEMOGRAPHICS) -------------------
 async function introScreen(){
   show(`
     <div class="message-container">
       <h1>${CONFIG.experimentName}</h1>
-      <p class="instructions-text">Welcome! In this study, you will be shown a series of statements. For each statement, please indicate whether you believe it is TRUE or FALSE.</p>
+      <p class="instructions-text">Welcome! In this study, you will be shown a series of statements. 
+      For each statement, please indicate whether you believe it is TRUE or FALSE as quickly and accurately as possible.</p>
+      <p class="instructions-text">This task includes approximately 64 statements and will take about 15-20 minutes to complete.</p>
+      
       <label class="input-label" for="prolificID">Please enter your Prolific ID:</label>
       <input type="text" id="prolificID" placeholder="Prolific ID" />
+      
       <br><br>
       <button id="startBtn">Continue</button>
     </div>
@@ -450,208 +666,591 @@ async function introScreen(){
   return new Promise(resolve => {
     document.getElementById('startBtn').onclick = () => {
       const pid = document.getElementById('prolificID').value.trim();
+
       if (!pid) { alert('Please enter your Prolific ID.'); return; }
+      
       state.prolificID = pid;
       resolve();
     };
   });
 }
 
+// ------------------- DEMOGRAPHICS SCREEN (REMOVED HEADLINE TYPE SELECTION) -------------------
 async function runDemographics() {
-  show(`<div class="questionnaire-container"><p class="question-text">Please enter your age:</p><input type="number" id="age_input" min="18" max="120" /><button id="next_btn">Next</button></div>`);
+  // 1. Age question
+  show(`
+    <div class="questionnaire-container">
+      <p class="question-text">Please enter your age:</p>
+      <input type="number" id="age_input" min="18" max="120" placeholder="Age" />
+      <button id="next_btn">Next</button>
+    </div>
+  `);
+  
   await new Promise(resolve => {
     document.getElementById('next_btn').onclick = () => {
-      const age = parseInt(document.getElementById('age_input').value);
-      if (!age || age < 18) { alert('Please enter a valid age (18+).'); return; }
-      state.age = age; resolve();
+      const ageInput = document.getElementById('age_input').value.trim();
+      const age = parseInt(ageInput);
+      
+      if (!ageInput || isNaN(age) || age < 18 || age > 120) {
+        alert('Please enter a valid age between 18 and 120.');
+        return;
+      }
+      
+      state.age = age;
+      resolve();
     };
   });
   
-  show(`<div class="questionnaire-container"><p class="question-text">Please select your gender:</p><select id="gender_select"><option value="" disabled selected>Select...</option><option value="male">Male</option><option value="female">Female</option><option value="non-binary">Non-binary</option><option value="prefer-not-to-say">Prefer not to say</option></select><button id="next_btn">Next</button></div>`);
+  // 2. Gender question
+  show(`
+    <div class="questionnaire-container">
+      <p class="question-text">Please select your gender:</p>
+      <select id="gender_select">
+        <option value="" disabled selected>Select an option</option>
+        <option value="male">Male</option>
+        <option value="female">Female</option>
+        <option value="non-binary">Non-binary/third gender</option>
+        <option value="prefer-not-to-say">Prefer not to say</option>
+        <option value="other">Other</option>
+      </select>
+      <input type="text" id="gender_other" style="display:none;" placeholder="Please specify" />
+      <button id="next_btn">Next</button>
+    </div>
+  `);
+  
+  // Show/hide the "other" text field based on selection
+  document.getElementById('gender_select').addEventListener('change', function() {
+    const otherField = document.getElementById('gender_other');
+    otherField.style.display = this.value === 'other' ? 'block' : 'none';
+  });
+  
   await new Promise(resolve => {
     document.getElementById('next_btn').onclick = () => {
-      const gender = document.getElementById('gender_select').value;
-      if (!gender) { alert('Please select an option.'); return; }
-      state.gender = gender; resolve();
+      const genderSelect = document.getElementById('gender_select');
+      const genderOther = document.getElementById('gender_other');
+      const selectedValue = genderSelect.value;
+      
+      if (!selectedValue) {
+        alert('Please select your gender.');
+        return;
+      }
+      
+      if (selectedValue === 'other' && !genderOther.value.trim()) {
+        alert('Please specify your gender.');
+        return;
+      }
+      
+      state.gender = selectedValue === 'other' ? `other: ${genderOther.value.trim()}` : selectedValue;
+      resolve();
     };
   });
   
-  show(`<div class="questionnaire-container"><p class="question-text">What is your highest level of education?</p><select id="education_select"><option value="" disabled selected>Select...</option><option value="no-highschool">Did not complete highschool</option><option value="highschool">Year 12 or equivalent</option><option value="diploma">Diploma or equivalent</option><option value="bachelors">Bachelor's degree</option><option value="postgrad">Post-graduate degree</option></select><button id="next_btn">Next</button></div>`);
+  // 3. Education question - updated with requested options
+  show(`
+    <div class="questionnaire-container">
+      <p class="question-text">What is your highest level of education?</p>
+      <select id="education_select">
+        <option value="" disabled selected>Select an option</option>
+        <option value="no-highschool">Did not complete highschool</option>
+        <option value="highschool">Year 12 or equivalent</option>
+        <option value="diploma">Diploma or equivalent</option>
+        <option value="bachelors">Bachelor's degree or equivalent</option>
+        <option value="postgrad">Post-graduate degree or equivalent (e.g., Master's or PhD)</option>
+      </select>
+      <button id="next_btn">Next</button>
+    </div>
+  `);
+  
   await new Promise(resolve => {
     document.getElementById('next_btn').onclick = () => {
-      const edu = document.getElementById('education_select').value;
-      if (!edu) { alert('Please select an option.'); return; }
-      state.education = edu; resolve();
+      const educationSelect = document.getElementById('education_select');
+      const selectedValue = educationSelect.value;
+      
+      if (!selectedValue) {
+        alert('Please select your education level.');
+        return;
+      }
+      
+      state.education = selectedValue;
+      resolve();
     };
   });
   
-  show(`<div class="questionnaire-container"><p class="question-text">Please select your political orientation:</p><select id="political_select"><option value="" disabled selected>Select...</option><option value="Left-leaning">Left-leaning</option><option value="Right-leaning">Right-leaning</option></select><button id="next_btn">Next</button></div>`);
+  // 4. Political orientation
+  show(`
+    <div class="questionnaire-container">
+      <p class="question-text">Please select your political orientation:</p>
+      <select id="political_select">
+        <option value="" disabled selected>Select an option</option>
+        <option value="Left-leaning">Left-leaning</option>
+        <option value="Right-leaning">Right-leaning</option>
+      </select>
+      <button id="next_btn">Next</button>
+    </div>
+  `);
+  
   await new Promise(resolve => {
     document.getElementById('next_btn').onclick = () => {
-      const pol = document.getElementById('political_select').value;
-      if (!pol) { alert('Please select an option.'); return; }
-      state.politicalOrientation = pol; resolve();
+      const politicalSelect = document.getElementById('political_select');
+      const selectedValue = politicalSelect.value;
+      
+      if (!selectedValue) {
+        alert('Please select your political orientation.');
+        return;
+      }
+      
+      state.politicalOrientation = selectedValue;
+      resolve();
     };
   });
   
+  // After demographics, randomly assign participant to a headline type condition
   state.participantHeadlineType = Math.random() < 0.5 ? 'Clickbait' : 'Not Clickbait';
+  console.log(`Participant randomly assigned to headline type: ${state.participantHeadlineType}`);
 }
 
-// ------------------- INSTRUCTIONS & TRIAL LOGIC -------------------
+// ------------------- INSTRUCTIONS SCREEN (UPDATED TO BE GENERIC WITHOUT REVEALING HEADLINE TYPE) -------------------
 async function showInstructionsScreen() {
     show(`
         <div class="message-container">
             <h2>Instructions</h2>
-            <p class="instructions-text">You will first see a fixation cross (+). Then, a statement will appear.<br>Your task is to decide if the statement is TRUE or FALSE using the Q and P keys.<br>${getKeyReminderHTML()}<br>Please respond as quickly and accurately as you can.<br>There will be a short practice session first.</p>
+            <p class="instructions-text">
+                You will first see a fixation cross (+) in the center of the screen. Please focus on it.
+                <br><br>
+                Then, a statement will appear.
+                <br><br>
+                Your task is to decide if the statement is TRUE or FALSE.
+                <br><br>
+                Respond using the Q and P keys:
+                <br><br>
+                ${getKeyReminderHTML()}
+                <br><br>
+                Please respond as quickly and as accurately as you can. You will have 15 seconds to respond to each statement.
+                <br><br>
+                If you don't respond within 15 seconds, you will see a message asking you to respond faster.
+                <br><br>
+                There will be a short practice session first. 
+                During the main experiment, there will be no feedback, and there will be short breaks every 16 trials.
+                <br><br>
+                <strong>Important:</strong> In this experiment, you will see approximately 64 headlines.
+            </p>
             <button id="startPracticeBtn">Start Practice</button>
         </div>
     `);
-    return new Promise(resolve => { document.getElementById('startPracticeBtn').onclick = resolve; });
+    return new Promise(resolve => {
+        document.getElementById('startPracticeBtn').onclick = resolve;
+    });
 }
 
+// ------------------- CORE TRIAL LOGIC (MODIFIED WITH CONSISTENT KEY REMINDER) -------------------
 async function runSingleTrial(stimulus, isPracticeTrial = false) {
   state.trialCountOverall++;
   state.currentTrialInBlock++;
 
+  // 1. Fixation Cross
   show(`<div class="fixation-cross-container">+</div>`);
   await sleep(CONFIG.fixationCrossDuration);
 
-  show(`<div class="stimulus-container"><p class="stimulus-text">${stimulus.statement_text}</p>${getKeyReminderHTML()}</div>`);
+  // 2. Statement Display with updated key reminder (no progress tracking)
+  show(`
+    <div class="stimulus-container">
+      <p class="stimulus-text">${stimulus.statement_text}</p> 
+      ${getKeyReminderHTML()}
+    </div>
+  `);
+  
   rtClock = performance.now();
 
+  // 3. Get Response (now using q and p keys)
   const responseResult = await waitKeysOrTimeout([CONFIG.responseKeys.true_key, CONFIG.responseKeys.false_key], CONFIG.statementTimeoutDuration);
   const rt = responseResult.timedOut ? CONFIG.statementTimeoutDuration : Math.round(performance.now() - rtClock);
   
-  let participantResponse = null, accuracy = null;
+  let participantResponse = null;
+  let accuracy = null;
+
   if (responseResult.timedOut) {
     participantResponse = 'TIMEOUT';
-    show(`<div class="message-container"><h3 class="warning-message">Time's Up!</h3><p>Please respond faster. Press SPACE to continue.</p></div>`);
+    accuracy = null; 
+    
+    // Show timeout warning message for both practice and main trials
+    show(`
+      <div class="message-container">
+        <h3 class="warning-message">Time's Up!</h3>
+        <p>Please try to respond more quickly. You have 15 seconds to make your judgment.</p>
+        <p>Remember:</p>
+        ${getKeyReminderHTML()}
+        <p>Press SPACE to continue.</p>
+      </div>
+    `);
     await waitKeys([' ']);
   } else {
+    // Determine which response was given based on the key assignment
     participantResponse = responseResult.key === CONFIG.responseKeys.true_key ? 'True' : 'False';
     accuracy = (participantResponse === 'True') === stimulus.truth_value ? 1 : 0;
   }
 
-  log({
-    prolific_id: state.prolificID, political_orientation: state.politicalOrientation,
-    participant_headline_type: state.participantHeadlineType, trial_number_overall: state.trialCountOverall,
-    block_type: state.currentBlock, trial_number_in_block: state.currentTrialInBlock,
-    statement_id: stimulus.statement_id, statement_text: stimulus.statement_text, 
+  // 4. Log Data (now with key assignment and avg_favorability)
+  const trialData = {
+    prolific_id: state.prolificID,
+    political_orientation: state.politicalOrientation,
+    participant_headline_type: state.participantHeadlineType,
+    key_assignment: state.keyAssignment, // Record which key was assigned to which response
+    trial_number_overall: state.trialCountOverall,
+    block_type: state.currentBlock,
+    trial_number_in_block: state.currentTrialInBlock,
+    statement_id: stimulus.statement_id,
+    statement_text: stimulus.statement_text, 
     headline_type: isPracticeTrial ? 'Practice' : stimulus.headline_type,
     truth_value_stimulus: stimulus.truth_value ? 'TRUE' : 'FALSE', 
     partisan_alignment_stimulus: stimulus.partisan_alignment,
     partisan_congruence: stimulus.partisan_congruence || 'N/A', 
-    is_practice_trial: isPracticeTrial ? 1 : 0, is_attention_check: stimulus.is_attention_check ? 1 : 0, 
-    response: participantResponse, accuracy: accuracy, rt_ms: rt,
-    avg_favorability: stimulus.avg_favorability || '',
-  });
+    is_practice_trial: isPracticeTrial ? 1 : 0,
+    is_attention_check: stimulus.is_attention_check ? 1 : 0, 
+    response: participantResponse,
+    accuracy: accuracy,
+    rt_ms: rt,
+    avg_favorability: stimulus.avg_favorability || '', // Include avg_favorability from stimulus
+  };
+  log(trialData);
 
+  // 5. Inter-Trial Interval (ITI)
   show(''); 
-  await sleep(getRandomInt(CONFIG.itiMinDuration, CONFIG.itiMaxDuration));
+  const itiDuration = getRandomInt(CONFIG.itiMinDuration, CONFIG.itiMaxDuration);
+  await sleep(itiDuration);
 }
 
-// ------------------- BLOCKS & EXPERIMENT FLOW -------------------
+// ------------------- BLOCKS & EXPERIMENT FLOW (UPDATED WITH GENERIC INSTRUCTIONS) -------------------
 async function runPracticeBlock() {
     state.currentBlock = 'Practice';
     state.currentTrialInBlock = 0;
-    show(`<div class="message-container"><h2>Practice Round</h2><p>Press SPACE to begin.</p></div>`);
+    show(`<div class="message-container">
+      <h2>Practice Round</h2>
+      <p>You will now see a few practice statements that have clear correct answers.</p>
+      <p>Remember:</p>
+      ${getKeyReminderHTML()}
+      <p>Press SPACE to begin.</p>
+    </div>`);
     await waitKeys([' ']);
-    for (const stimulus of state.practiceStimuli) {
-        await runSingleTrial(stimulus, true);
+
+    if (state.practiceStimuli.length === 0) {
+        show(`<div class="message-container"><p class="error-text">No practice stimuli available. Please check configuration.</p></div>`);
+        return Promise.reject("No practice stimuli defined");
     }
-    show(`<div class="message-container"><h2>End of Practice</h2><p>The main experiment will now begin.</p><button id="startMainBtn">Start Main Experiment</button></div>`);
-    return new Promise(resolve => { document.getElementById('startMainBtn').onclick = resolve; });
+    
+    // Run through practice trials with feedback
+    for (const stimulus of state.practiceStimuli) {
+        // Show the stimulus
+        state.trialCountOverall++;
+        state.currentTrialInBlock++;
+        
+        // 1. Fixation Cross
+        show(`<div class="fixation-cross-container">+</div>`);
+        await sleep(CONFIG.fixationCrossDuration);
+
+        // 2. Statement Display with updated key reminder
+        show(`
+          <div class="stimulus-container">
+            <p class="stimulus-text">${stimulus.statement_text}</p> 
+            ${getKeyReminderHTML()}
+          </div>
+        `);
+        
+        rtClock = performance.now();
+
+        // 3. Get Response (now using q and p keys)
+        const responseResult = await waitKeysOrTimeout([CONFIG.responseKeys.true_key, CONFIG.responseKeys.false_key], CONFIG.statementTimeoutDuration);
+        const rt = responseResult.timedOut ? CONFIG.statementTimeoutDuration : Math.round(performance.now() - rtClock);
+        
+        let participantResponse = null;
+        let accuracy = null;
+
+        if (responseResult.timedOut) {
+          participantResponse = 'TIMEOUT';
+          accuracy = null;
+          // Show timeout feedback with enhanced warning
+          show(`<div class="message-container">
+            <h3 class="warning-message">Time's Up!</h3>
+            <p>Please try to respond more quickly. You have 15 seconds to make your judgment.</p>
+            <p>Remember:</p>
+            ${getKeyReminderHTML()}
+            <p>Press SPACE to continue.</p>
+          </div>`);
+        } else {
+          participantResponse = responseResult.key === CONFIG.responseKeys.true_key ? 'True' : 'False';
+          accuracy = (participantResponse === 'True') === stimulus.truth_value ? 1 : 0;
+          
+          // Show feedback based on accuracy
+          if (accuracy === 1) {
+            show(`<div class="message-container">
+              <h3>Correct!</h3>
+              <p>This statement is ${stimulus.truth_value ? 'TRUE' : 'FALSE'}.</p>
+              <p>Remember:</p>
+              ${getKeyReminderHTML()}
+              <p>Press SPACE to continue.</p>
+            </div>`);
+          } else {
+            show(`<div class="message-container">
+              <h3>Incorrect</h3>
+              <p>This statement is actually ${stimulus.truth_value ? 'TRUE' : 'FALSE'}.</p>
+              <p>Remember:</p>
+              ${getKeyReminderHTML()}
+              <p>Press SPACE to continue.</p>
+            </div>`);
+          }
+        }
+
+        // 4. Log Data (now with key assignment)
+        const trialData = {
+          prolific_id: state.prolificID,
+          political_orientation: state.politicalOrientation,
+          participant_headline_type: state.participantHeadlineType,
+          key_assignment: state.keyAssignment,
+          trial_number_overall: state.trialCountOverall,
+          block_type: state.currentBlock,
+          trial_number_in_block: state.currentTrialInBlock,
+          statement_id: stimulus.statement_id,
+          statement_text: stimulus.statement_text, 
+          headline_type: 'Practice',
+          truth_value_stimulus: stimulus.truth_value ? 'TRUE' : 'FALSE', 
+          partisan_alignment_stimulus: stimulus.partisan_alignment,
+          partisan_congruence: stimulus.partisan_congruence || 'N/A', 
+          is_practice_trial: 1,
+          is_attention_check: stimulus.is_attention_check ? 1 : 0, 
+          response: participantResponse,
+          accuracy: accuracy,
+          rt_ms: rt,
+          avg_favorability: stimulus.avg_favorability || '',
+        };
+        log(trialData);
+
+        // Wait for space to continue
+        await waitKeys([' ']);
+        
+        // 5. Inter-Trial Interval (ITI)
+        show(''); 
+        const itiDuration = getRandomInt(CONFIG.itiMinDuration, CONFIG.itiMaxDuration);
+        await sleep(itiDuration);
+    }
+
+    show(`<div class="message-container">
+      <h2>End of Practice</h2>
+      <p>You have completed the practice round. Now you will move on to the main experiment with political headlines.</p>
+      <p>Remember to respond within 15 seconds for each statement.</p>
+      <p>The main experiment includes approximately 64 headlines and will take about 15-20 minutes.</p>
+      <p>Remember:</p>
+      ${getKeyReminderHTML()}
+      <button id="startMainBtn">Start Main Experiment</button>
+    </div>`);
+    return new Promise(resolve => {
+        document.getElementById('startMainBtn').onclick = resolve;
+    });
 }
 
 async function runMainExperimentBlock() {
     state.currentBlock = 'MainExperiment';
     state.currentTrialInBlock = 0;
-    show(`<div class="message-container"><h2>Main Experiment</h2><p>Press SPACE to begin.</p></div>`);
+    show(`<div class="message-container">
+      <h2>Main Experiment</h2>
+      <p>The main experiment will now begin. Remember to respond as quickly and accurately as possible.<br>
+      You have 15 seconds to respond to each statement.<br>
+      There will be short breaks every 16 trials.</p>
+      <p>You will see approximately 64 headlines.</p>
+      <p>Remember:</p>
+      ${getKeyReminderHTML()}
+      <p>Press SPACE to begin.</p>
+    </div>`);
     await waitKeys([' ']);
+    
+    if (state.mainExperimentStimuli.length === 0) {
+        show(`<div class="message-container"><p class="error-text">No main experiment stimuli available for the assigned headline type. Please check configuration and CSV processing.</p></div>`);
+        return Promise.reject("No main stimuli available");
+    }
+    
     for (let i = 0; i < state.mainExperimentStimuli.length; i++) {
-        await runSingleTrial(state.mainExperimentStimuli[i], false);
+        const stimulus = state.mainExperimentStimuli[i];
+        await runSingleTrial(stimulus, false);
+
         if ((i + 1) < state.mainExperimentStimuli.length && (i + 1) % CONFIG.trialsPerBreak === 0) {
-            show(`<div class="message-container"><h2>Break Time!</h2><p>Press SPACE when ready to continue.</p></div>`);
+            // Break message without progress tracking
+            show(`<div class="message-container">
+              <h2>Break Time!</h2>
+              <p>Please take a short break. Press SPACE when you are ready to continue.</p>
+              <p>Remember:</p>
+              ${getKeyReminderHTML()}
+            </div>`);
             await waitKeys([' ']);
+            show(`<div class="fixation-cross-container">+</div>`); 
+            await sleep(1000); 
         }
     }
 }
 
-// ------------------- DEBRIEFING & FINISH (★ MODIFIED) -------------------
-async function showDebriefingAndFinish(uploadSuccess = true) {
+// ------------------- DEBRIEFING SCREEN (FIXED) -------------------
+async function showDebriefing() {
+  // Determine which debriefing file to load based on participant's condition
   const debriefFile = state.participantHeadlineType === 'Clickbait' ? 'debrief_clickbait.txt' : 'debrief_headline.txt';
-  let debriefHTML = `<p>Thank you for your participation.</p>`; // Fallback
+  const debriefPDF = state.participantHeadlineType === 'Clickbait' ? 'debrief_clickbait.pdf' : 'debrief_headline.pdf';
+  
+  // Default debriefing text in case the file cannot be loaded
+  let defaultDebriefHTML = `
+    <h2>Debriefing Statement</h2>
+    <p>Thank you for participating in our study on truth judgments of political headlines.</p>
+    <p>In this study, we were investigating how different presentation formats of the same information might influence people's judgments of truthfulness.</p>
+    <p>We presented you with headlines in a ${state.participantHeadlineType === 'Clickbait' ? 'clickbait' : 'straightforward news'} format to understand how this presentation style affects truth judgments.</p>
+    <p>Your data will help us better understand how information presentation influences belief formation and can inform strategies to combat misinformation.</p>
+    <p>If you have any questions about this research, please contact the research team.</p>
+  `;
   
   try {
+    // Try to load the appropriate debriefing file
     const response = await fetch(debriefFile);
-    if (response.ok) debriefHTML = await response.text();
-  } catch (e) {
-    console.error("Could not load debrief file:", e);
-  }
-
-  let message = '';
-  if (uploadSuccess) {
-    message = `<p><strong>Your data has been successfully uploaded.</strong></p>
-               <p>Please click the arrow below to complete the study and return to Prolific.</p>`;
-  } else {
-    message = `<h2>Network error – data downloaded locally.</h2>
-               <p style="text-align:center;">There was an issue uploading your data. A file has been downloaded to your computer instead.</p>
-               <p style="text-align:center;">Please email this file to the researcher, then click the arrow to return to Prolific.</p>`;
-  }
-
-  const finalScreenHTML = `
-    <div class="questionnaire-container">
-      <h1>Debriefing Information</h1>
-      <div class="debrief-content">${debriefHTML}</div>
-      ${message}
-      <div class="button-bar">
-        <a href="${CONFIG.prolificURL}" style="font-size: 2.5rem; text-decoration: none; color: var(--fg);">&rarr;</a>
-      </div>
-    </div>`;
-  
-  show(finalScreenHTML);
-}
-
-async function finishExperiment(){ 
-  const csv = toCSV(state.data);
-  const filename = `${CONFIG.experimentName.replace(/\s+/g, '_')}_${state.prolificID}.csv`;
-  
-  show('<div class="message-container"><h2>Uploading your data…</h2><p>Please wait.</p></div>');
-  
-  try {
-    const response = await uploadCSV(filename, csv);
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    await showDebriefingAndFinish(true);
-  } catch (err) {
-    console.error('Data upload failed:', err);
-    if (CONFIG.fallbackDownload) {
-      downloadCSV(csv, filename);
+    if (response.ok) {
+      // If file loaded successfully, use its content
+      const debriefContent = await response.text();
+      
+      show(`
+        <div class="info-container">
+          ${debriefContent}
+          <div class="button-container">
+            <a href="${debriefPDF}" download target="_blank" rel="noopener noreferrer" style="text-decoration: none;"><button>Download Debriefing (PDF)</button></a>
+            <a href="fact-checks.txt" download target="_blank" rel="noopener noreferrer" style="text-decoration: none;"><button>Download Fact-Checking Sheet</button></a>
+            <button id="finish_btn">Finish</button>
+          </div>
+        </div>
+      `);
+    } else {
+      // If file couldn't be loaded, use the default text
+      console.warn(`Could not load debriefing file: ${debriefFile}`);
+      show(`
+        <div class="info-container">
+          ${defaultDebriefHTML}
+          <div class="button-container">
+            <a href="fact-checks.txt" download target="_blank" rel="noopener noreferrer" style="text-decoration: none;"><button>Download Fact-Checking Sheet</button></a>
+            <button id="finish_btn">Finish</button>
+          </div>
+        </div>
+      `);
     }
-    await showDebriefingAndFinish(false);
+  } catch (e) {
+    // If there was an error loading the file, use the default text
+    console.error(`Error loading debriefing file: ${e.message}`);
+    show(`
+      <div class="info-container">
+        ${defaultDebriefHTML}
+        <div class="button-container">
+          <a href="fact-checks.txt" download target="_blank" rel="noopener noreferrer" style="text-decoration: none;"><button>Download Fact-Checking Sheet</button></a>
+          <button id="finish_btn">Finish</button>
+        </div>
+      </div>
+    `);
   }
+  
+  // Wait for the participant to click finish
+  await new Promise(resolve => {
+    document.getElementById('finish_btn').onclick = resolve;
+  });
+  
+  // Final thank you message
+  show(`
+    <div class="message-container">
+      <h2>Thank You!</h2>
+      <p>Your participation is complete. You may now close this window and return to Prolific.</p>
+    </div>
+  `);
 }
 
-// ------------------- LAUNCH (★ MODIFIED) -------------------
+// FIXED: Improved finishExperiment function with better error handling
+function finishExperiment(){ 
+  const csv = toCSV(state.data);
+  const filename = `${CONFIG.experimentName.replace(/\s+/g, '_')}_${state.prolificID}_${state.participantHeadlineType}_${new Date().toISOString().slice(0,10)}.csv`;
+  
+  show('<div class="message-container"><h2>Uploading your data…</h2><p>Please wait. Do not close this window.</p></div>');
+  
+  // Only log data size, not the entire dataset
+  console.log(`Preparing to upload data (${new Blob([csv]).size} bytes)`);
+  
+  // Try to upload data with improved error handling
+  uploadCSV(filename, csv)
+    .then(response => {
+      console.log("Upload response status:", response.status, response.statusText);
+      
+      // FIXED: Simplified error handling
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status} ${response.statusText}`);
+      }
+      return response.json();
+    })
+    .then(result => {
+      console.log('Upload successful:', result);
+      // After successful data upload, show the debriefing
+      showDebriefing();
+    })
+    .catch(err => {
+      console.error('Data upload failed:', err);
+      if (CONFIG.fallbackDownload) {
+        show(`<div class="message-container">
+                <h2>Data Upload Error</h2>
+                <p class="error-text">There was an error uploading your data. 
+                A CSV file of your data will be downloaded to your computer instead.</p>
+                <p><b>Please ensure you send this downloaded file ('${filename}') to the researcher.</b></p>
+                <p>Click the button below if the download doesn't start automatically.</p>
+                <button id="manualDownloadBtn">Download Data Manually</button>
+                <button id="continue_to_debrief">Continue to Debriefing</button>
+              </div>`);
+        document.getElementById('manualDownloadBtn').onclick = () => downloadCSV(csv, filename);
+        document.getElementById('continue_to_debrief').onclick = () => showDebriefing();
+        downloadCSV(csv, filename); 
+      } else {
+        show(`<div class="message-container">
+                <h2>Critical Error</h2>
+                <p class="error-text">Sorry, your data could not be saved due to a network error, and local download is disabled.</p>
+                <p>Please take a screenshot of this page (including any console errors if possible - Ctrl+Shift+J or Cmd+Opt+J) and contact the researcher.</p>
+                <p>Error details: ${err.message}</p>
+                <button id="continue_to_debrief">Continue to Debriefing</button>
+              </div>`);
+        document.getElementById('continue_to_debrief').onclick = () => showDebriefing();
+      }
+    });
+}
+
+// ------------------- LAUNCH -------------------
 (async () => {
   try {
-    show('<h2>Loading...</h2>');
+    show('<h2>Loading experiment configuration...</h2>');
     await loadCSVStimuli(); 
     
-    // ★ This function now handles the entire PIS/Consent/Screening flow
-    await showInformationAndConsent();
+    // First show information sheet and get consent
+    const consentGiven = await showInformationAndConsent();
+    if (!consentGiven) {
+      // Stop the experiment if consent was not given
+      return;
+    }
     
-    // If screening is passed, the script will continue from here
+    // Then collect Prolific ID
     await introScreen();
+    
+    // Then collect demographics and randomly assign headline type
     await runDemographics();
+    
+    show('<h2>Preparing experiment trials...</h2>');
     prepareExperimentTrials();
+    
     await showInstructionsScreen();
     await runPracticeBlock();
     await runMainExperimentBlock();
-    await finishExperiment();
+    
+    finishExperiment();
 
   } catch (e) {
     console.error("Experiment Error:", e);
-    stage.innerHTML = `<div class="message-container"><h2 style="color:red;">An Error Occurred</h2><p><b>Error:</b> ${e.message}</p><p>Please contact the researcher.</p></div>`;
+    stage.innerHTML = `
+        <div class="message-container">
+            <h2 style="color:red;">An Error Occurred</h2>
+            <p class="error-text">Unfortunately, the experiment encountered a problem and cannot continue.</p>
+            <p><b>Error message:</b> ${e.message}</p>
+            <p>Please copy this error message, and any details from the browser console (Ctrl+Shift+J or Cmd+Opt+J) and contact the researcher.</p>
+            <pre style="text-align:left; background-color:#333; padding:10px; border-radius:5px; max-height:200px; overflow-y:auto;">${e.stack || ''}</pre>
+        </div>`;
   }
 })();
 </script>
