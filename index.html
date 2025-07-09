@@ -104,6 +104,20 @@
       color: var(--warning-color);
       margin-top: 1em;
     }
+    .completion-arrow {
+      font-size: 2rem;
+      padding: 1rem 2rem;
+      margin-top: 1.5rem;
+      cursor: pointer;
+      background: #2a2a2a;
+      border: 1px solid #555;
+      border-radius: 8px;
+      transition: all 0.3s;
+    }
+    .completion-arrow:hover {
+      background: #3a3a3a;
+      transform: translateX(5px);
+    }
   </style>
 </head>
 <body>
@@ -111,7 +125,7 @@
 
 <script>
 // -------------------- CONFIG --------------------
-// Current Date and Time (UTC - YYYY-MM-DD HH:MM:SS formatted): 2025-07-09 06:05:12
+// Current Date and Time (UTC - YYYY-MM-DD HH:MM:SS formatted): 2025-07-09 06:12:12
 // Current User's Login: fletchersc0
 
 const CONFIG = {
@@ -137,6 +151,9 @@ const CONFIG = {
   headlineTypes          : ['Clickbait', 'Not Clickbait'],
   truthValues            : ['True', 'False'], 
   congruenceLevels       : ['Congruent', 'Incongruent'],
+
+  // Prolific completion URL
+  prolificCompletionURL  : 'https://app.prolific.co/submissions/complete?cc=C13G9PW2',
 
   // Predefined practice trials - obvious facts and myths
   practiceTrials         : [
@@ -1085,7 +1102,7 @@ async function runMainExperimentBlock() {
     }
 }
 
-// ------------------- DEBRIEFING SCREEN (FIXED) -------------------
+// ------------------- DEBRIEFING SCREEN (MODIFIED WITH PROLIFIC REDIRECT) -------------------
 async function showDebriefing() {
   // Determine which debriefing file to load based on participant's condition
   const debriefFile = state.participantHeadlineType === 'Clickbait' ? 'debrief_clickbait.txt' : 'debrief_headline.txt';
@@ -1150,13 +1167,20 @@ async function showDebriefing() {
     document.getElementById('finish_btn').onclick = resolve;
   });
   
-  // Final thank you message
+  // Final thank you message with Prolific redirect arrow
   show(`
     <div class="message-container">
       <h2>Thank You!</h2>
-      <p>Your participation is complete. You may now close this window and return to Prolific.</p>
+      <p>Your participation is complete.</p>
+      <p>Click the arrow below to complete the study and return to Prolific:</p>
+      <button class="completion-arrow" id="completion_arrow">→</button>
     </div>
   `);
+  
+  // Set up the completion arrow to redirect to Prolific with completion code
+  document.getElementById('completion_arrow').onclick = () => {
+    window.location.href = CONFIG.prolificCompletionURL;
+  };
 }
 
 // FIXED: Improved finishExperiment function with better error handling
