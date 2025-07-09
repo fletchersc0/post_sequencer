@@ -67,7 +67,13 @@
       max-width: 90%; 
     }
     .instructions-text, .message-text { font-size:1.1rem; line-height:1.6; margin-bottom:1em;}
-    .key-reminder { font-size:1rem; color: #ccc; margin-top: 1em;}
+    .key-reminder { 
+      font-size:1rem; 
+      color: #ccc; 
+      margin-top: 1em;
+      width: 100%;
+      overflow: hidden;
+    }
     .loading, .error-text { font-size:1.2rem; color: #aaa; }
     .input-label { display: block; margin-top: 1em; margin-bottom: 0.2em; }
     .warning-message {
@@ -209,6 +215,14 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 const shuffle = arr => { for(let i = arr.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [arr[i], arr[j]] = [arr[j], arr[i]]; } return arr; };
 const show = html => stage.innerHTML = html;
 const getRandomInt = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
+
+// Key reminder helper function that maintains spatial layout
+function getKeyReminderHTML() {
+  return `<p class="key-reminder">
+    <span style="float:left; width:45%; text-align:left;">Q = ${CONFIG.responseKeys.true_key === 'q' ? 'TRUE' : 'FALSE'}</span>
+    <span style="float:right; width:45%; text-align:right;">P = ${CONFIG.responseKeys.true_key === 'p' ? 'TRUE' : 'FALSE'}</span>
+  </p>`;
+}
 
 // ------------------------ DATA LOGGING FUNCTIONS ------------------------
 function log(dataRow) {
@@ -502,7 +516,7 @@ async function introScreen(){
   });
 }
 
-// ------------------- INSTRUCTIONS SCREEN (UPDATED FOR Q/P KEYS) -------------------
+// ------------------- INSTRUCTIONS SCREEN (UPDATED FOR Q/P KEYS WITH CONSISTENT LAYOUT) -------------------
 async function showInstructionsScreen() {
     show(`
         <div class="message-container">
@@ -514,9 +528,9 @@ async function showInstructionsScreen() {
                 <br><br>
                 Your task is to decide if the statement is TRUE or FALSE.
                 <br><br>
-                Press the '${CONFIG.responseKeys.true_key.toUpperCase()}' key if you think it's TRUE.
-                <br>
-                Press the '${CONFIG.responseKeys.false_key.toUpperCase()}' key if you think it's FALSE.
+                Respond using the Q and P keys:
+                <br><br>
+                ${getKeyReminderHTML()}
                 <br><br>
                 Please respond as quickly and as accurately as you can. You will have 15 seconds to respond to each statement.
                 <br><br>
@@ -536,7 +550,7 @@ async function showInstructionsScreen() {
 }
 
 
-// ------------------- CORE TRIAL LOGIC (MODIFIED TO REMOVE PROGRESS TRACKING) -------------------
+// ------------------- CORE TRIAL LOGIC (MODIFIED WITH CONSISTENT KEY REMINDER) -------------------
 async function runSingleTrial(stimulus, isPracticeTrial = false) {
   state.trialCountOverall++;
   state.currentTrialInBlock++;
@@ -549,7 +563,7 @@ async function runSingleTrial(stimulus, isPracticeTrial = false) {
   show(`
     <div class="stimulus-container">
       <p class="stimulus-text">${stimulus.statement_text}</p> 
-      <p class="key-reminder">TRUE = '${CONFIG.responseKeys.true_key.toUpperCase()}' / FALSE = '${CONFIG.responseKeys.false_key.toUpperCase()}'</p>
+      ${getKeyReminderHTML()}
     </div>
   `);
   
@@ -571,9 +585,8 @@ async function runSingleTrial(stimulus, isPracticeTrial = false) {
       <div class="message-container">
         <h3 class="warning-message">Time's Up!</h3>
         <p>Please try to respond more quickly. You have 15 seconds to make your judgment.</p>
-        <p>Remember:<br>
-        TRUE = '${CONFIG.responseKeys.true_key.toUpperCase()}'<br>
-        FALSE = '${CONFIG.responseKeys.false_key.toUpperCase()}'</p>
+        <p>Remember:</p>
+        ${getKeyReminderHTML()}
         <p>Press SPACE to continue.</p>
       </div>
     `);
@@ -614,16 +627,15 @@ async function runSingleTrial(stimulus, isPracticeTrial = false) {
   await sleep(itiDuration);
 }
 
-// ------------------- BLOCKS & EXPERIMENT FLOW (UPDATED TO REMOVE PROGRESS TRACKING) -------------------
+// ------------------- BLOCKS & EXPERIMENT FLOW (UPDATED WITH CONSISTENT KEY REMINDER) -------------------
 async function runPracticeBlock() {
     state.currentBlock = 'Practice';
     state.currentTrialInBlock = 0;
     show(`<div class="message-container">
       <h2>Practice Round</h2>
       <p>You will now see a few practice statements that have clear correct answers.</p>
-      <p>Remember:<br>
-      TRUE = '${CONFIG.responseKeys.true_key.toUpperCase()}'<br>
-      FALSE = '${CONFIG.responseKeys.false_key.toUpperCase()}'</p>
+      <p>Remember:</p>
+      ${getKeyReminderHTML()}
       <p>Press SPACE to begin.</p>
     </div>`);
     await waitKeys([' ']);
@@ -647,7 +659,7 @@ async function runPracticeBlock() {
         show(`
           <div class="stimulus-container">
             <p class="stimulus-text">${stimulus.statement_text}</p> 
-            <p class="key-reminder">TRUE = '${CONFIG.responseKeys.true_key.toUpperCase()}' / FALSE = '${CONFIG.responseKeys.false_key.toUpperCase()}'</p>
+            ${getKeyReminderHTML()}
           </div>
         `);
         
@@ -667,9 +679,8 @@ async function runPracticeBlock() {
           show(`<div class="message-container">
             <h3 class="warning-message">Time's Up!</h3>
             <p>Please try to respond more quickly. You have 15 seconds to make your judgment.</p>
-            <p>Remember:<br>
-            TRUE = '${CONFIG.responseKeys.true_key.toUpperCase()}'<br>
-            FALSE = '${CONFIG.responseKeys.false_key.toUpperCase()}'</p>
+            <p>Remember:</p>
+            ${getKeyReminderHTML()}
             <p>Press SPACE to continue.</p>
           </div>`);
         } else {
@@ -681,18 +692,16 @@ async function runPracticeBlock() {
             show(`<div class="message-container">
               <h3>Correct!</h3>
               <p>This statement is ${stimulus.truth_value ? 'TRUE' : 'FALSE'}.</p>
-              <p>Remember:<br>
-              TRUE = '${CONFIG.responseKeys.true_key.toUpperCase()}'<br>
-              FALSE = '${CONFIG.responseKeys.false_key.toUpperCase()}'</p>
+              <p>Remember:</p>
+              ${getKeyReminderHTML()}
               <p>Press SPACE to continue.</p>
             </div>`);
           } else {
             show(`<div class="message-container">
               <h3>Incorrect</h3>
               <p>This statement is actually ${stimulus.truth_value ? 'TRUE' : 'FALSE'}.</p>
-              <p>Remember:<br>
-              TRUE = '${CONFIG.responseKeys.true_key.toUpperCase()}'<br>
-              FALSE = '${CONFIG.responseKeys.false_key.toUpperCase()}'</p>
+              <p>Remember:</p>
+              ${getKeyReminderHTML()}
               <p>Press SPACE to continue.</p>
             </div>`);
           }
@@ -736,8 +745,8 @@ async function runPracticeBlock() {
       <p>You have completed the practice round. Now you will move on to the main experiment with political headlines.</p>
       <p>Remember to respond within 15 seconds for each statement.</p>
       <p>The main experiment includes approximately 64 ${state.participantHeadlineType} headlines and will take about 15-20 minutes.</p>
-      <p>TRUE = '${CONFIG.responseKeys.true_key.toUpperCase()}'<br>
-      FALSE = '${CONFIG.responseKeys.false_key.toUpperCase()}'</p>
+      <p>Remember:</p>
+      ${getKeyReminderHTML()}
       <button id="startMainBtn">Start Main Experiment</button>
     </div>`);
     return new Promise(resolve => {
@@ -754,9 +763,8 @@ async function runMainExperimentBlock() {
       You have 15 seconds to respond to each statement.<br>
       There will be short breaks every 16 trials.</p>
       <p>You will see approximately 64 ${state.participantHeadlineType} headlines.</p>
-      <p>Remember:<br>
-      TRUE = '${CONFIG.responseKeys.true_key.toUpperCase()}'<br>
-      FALSE = '${CONFIG.responseKeys.false_key.toUpperCase()}'</p>
+      <p>Remember:</p>
+      ${getKeyReminderHTML()}
       <p>Press SPACE to begin.</p>
     </div>`);
     await waitKeys([' ']);
@@ -775,9 +783,8 @@ async function runMainExperimentBlock() {
             show(`<div class="message-container">
               <h2>Break Time!</h2>
               <p>Please take a short break. Press SPACE when you are ready to continue.</p>
-              <p>Remember:<br>
-              TRUE = '${CONFIG.responseKeys.true_key.toUpperCase()}'<br>
-              FALSE = '${CONFIG.responseKeys.false_key.toUpperCase()}'</p>
+              <p>Remember:</p>
+              ${getKeyReminderHTML()}
             </div>`);
             await waitKeys([' ']);
             show(`<div class="fixation-cross-container">+</div>`); 
