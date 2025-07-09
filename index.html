@@ -105,7 +105,7 @@
 
 <script>
 // -------------------- CONFIG --------------------
-// Current Date and Time (UTC): 2025-07-09 03:51:40
+// Current Date and Time (UTC - YYYY-MM-DD HH:MM:SS formatted): 2025-07-09 04:10:29
 // Current User's Login: fletchersc0
 
 const CONFIG = {
@@ -1051,7 +1051,7 @@ async function runMainExperimentBlock() {
     }
 }
 
-// ------------------- DEBRIEFING SCREEN (NEW) -------------------
+// ------------------- DEBRIEFING SCREEN (FIXED) -------------------
 async function showDebriefing() {
   // Determine which debriefing file to load based on participant's condition
   const debriefFile = state.participantHeadlineType === 'Clickbait' ? 'debrief_clickbait.txt' : 'debrief_headline.txt';
@@ -1079,7 +1079,7 @@ async function showDebriefing() {
           ${debriefContent}
           <div class="button-container">
             <a href="${debriefPDF}" download target="_blank" rel="noopener noreferrer" style="text-decoration: none;"><button>Download Debriefing (PDF)</button></a>
-            <a href="fact-checks.pdf" download target="_blank" rel="noopener noreferrer" style="text-decoration: none;"><button>Download Fact-Checking Sheet</button></a>
+            <a href="fact-checks.txt" download target="_blank" rel="noopener noreferrer" style="text-decoration: none;"><button>Download Fact-Checking Sheet</button></a>
             <button id="finish_btn">Finish</button>
           </div>
         </div>
@@ -1091,6 +1091,7 @@ async function showDebriefing() {
         <div class="info-container">
           ${defaultDebriefHTML}
           <div class="button-container">
+            <a href="fact-checks.txt" download target="_blank" rel="noopener noreferrer" style="text-decoration: none;"><button>Download Fact-Checking Sheet</button></a>
             <button id="finish_btn">Finish</button>
           </div>
         </div>
@@ -1103,6 +1104,7 @@ async function showDebriefing() {
       <div class="info-container">
         ${defaultDebriefHTML}
         <div class="button-container">
+          <a href="fact-checks.txt" download target="_blank" rel="noopener noreferrer" style="text-decoration: none;"><button>Download Fact-Checking Sheet</button></a>
           <button id="finish_btn">Finish</button>
         </div>
       </div>
@@ -1129,6 +1131,10 @@ function finishExperiment(){
   
   show('<div class="message-container"><h2>Uploading your data…</h2><p>Please wait. Do not close this window.</p></div>');
   
+  // Log data to console for debugging and ensure we can continue to debriefing
+  console.log("Data to be uploaded:", csv);
+  
+  // Try to upload data
   uploadCSV(filename, csv)
     .then(response => {
       if (!response.ok) {
