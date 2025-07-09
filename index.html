@@ -511,12 +511,11 @@ async function introScreen(){
   });
 }
 
-// ------------------- NEW DEMOGRAPHICS SCREEN -------------------
+// ------------------- NEW DEMOGRAPHICS SCREEN (REMOVED TITLES) -------------------
 async function runDemographics() {
   // 1. Age question
   show(`
     <div class="questionnaire-container">
-      <h2>Demographics</h2>
       <p class="question-text">Please enter your age:</p>
       <input type="number" id="age_input" min="18" max="120" placeholder="Age" />
       <button id="next_btn">Next</button>
@@ -541,7 +540,6 @@ async function runDemographics() {
   // 2. Gender question
   show(`
     <div class="questionnaire-container">
-      <h2>Demographics</h2>
       <p class="question-text">Please select your gender:</p>
       <select id="gender_select">
         <option value="" disabled selected>Select an option</option>
@@ -586,7 +584,6 @@ async function runDemographics() {
   // 3. Education question
   show(`
     <div class="questionnaire-container">
-      <h2>Demographics</h2>
       <p class="question-text">What is your highest level of education?</p>
       <select id="education_select">
         <option value="" disabled selected>Select an option</option>
@@ -622,7 +619,6 @@ async function runDemographics() {
   // 4. Political orientation (moved from intro screen)
   show(`
     <div class="questionnaire-container">
-      <h2>Political Orientation</h2>
       <p class="question-text">Please select your political orientation:</p>
       <select id="political_select">
         <option value="" disabled selected>Select an option</option>
@@ -651,7 +647,6 @@ async function runDemographics() {
   // 5. Headline type selection
   show(`
     <div class="questionnaire-container">
-      <h2>Headline Type</h2>
       <p class="question-text">Please select your headline type focus for this session:</p>
       <select id="headline_select">
         <option value="" disabled selected>Select an option</option>
