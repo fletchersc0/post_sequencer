@@ -586,12 +586,16 @@ async function runDemographics() {
     <div class="questionnaire-container">
       <p class="question-text">What is your highest level of education?</p>
       <select id="education_select">
-          <option value="" disabled selected>Select an option</option>
-          <option value="no-highschool">Did not complete highschool</option>
-          <option value="highschool">Year 12 or equivalent</option>
-          <option value="diploma">Diploma or equivalent</option>
-          <option value="bachelors">Bachelor's degree or equivalent</option>
-          <option value="postgrad">Post-graduate degree or equivalent (e.g., Master's or PhD)</option>
+        <option value="" disabled selected>Select an option</option>
+        <option value="less-than-high-school">Less than high school</option>
+        <option value="high-school">High school graduate</option>
+        <option value="some-college">Some college</option>
+        <option value="associate">Associate degree</option>
+        <option value="bachelor">Bachelor's degree</option>
+        <option value="master">Master's degree</option>
+        <option value="doctorate">Doctorate degree</option>
+        <option value="professional">Professional degree</option>
+        <option value="prefer-not-to-say">Prefer not to say</option>
       </select>
       <button id="next_btn">Next</button>
     </div>
