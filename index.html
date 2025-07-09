@@ -55,10 +55,22 @@
       height:6em; 
       display:flex;align-items:center;justify-content:center;
     }
-    .stimulus-container, .message-container, .questionnaire-container {
+    .stimulus-container, .message-container, .questionnaire-container, .info-container {
       min-height:12em; 
       display:flex;flex-direction:column;align-items:center;justify-content:center;
       padding: 1em;
+    }
+    .info-container {
+      text-align: left;
+      max-width: 680px;
+      margin: auto;
+      line-height: 1.6;
+    }
+    .info-container h2 { text-align: center; }
+    .info-container .button-container {
+      text-align: center;
+      width: 100%;
+      margin-top: 2em;
     }
     .stimulus-text { 
       font-size: 1.8rem; 
@@ -292,6 +304,121 @@ function downloadCSV(csvData, filename){
   URL.revokeObjectURL(url);
 }
 
+// ------------------- INFORMATION & CONSENT SCREEN -------------------
+async function showInformationAndConsent() {
+  // Default information text - replace with your own participant information
+  const participantInfoHTML = `
+    <h2>Participant Information Sheet</h2>
+    <p>You are invited to take part in a research study about how people judge the truthfulness of different types of headlines.</p>
+    
+    <h3>What is the purpose of the study?</h3>
+    <p>This study aims to understand how people determine whether news headlines are true or false, and how different presentation styles might influence these judgments.</p>
+    
+    <h3>What will I be asked to do?</h3>
+    <p>You will be shown a series of headlines and asked to judge whether each one is true or false as quickly and accurately as possible. The task will take approximately 15-20 minutes to complete.</p>
+    
+    <h3>Risks and benefits</h3>
+    <p>There are no known risks associated with this study. Your participation will help advance our understanding of how people evaluate information.</p>
+    
+    <h3>Data protection and confidentiality</h3>
+    <p>Your responses will be kept completely anonymous. We will collect your Prolific ID only for payment purposes. Your demographic information will not be linked to your identity.</p>
+    
+    <h3>Ethics approval</h3>
+    <p>This study has received ethical approval from [University Name] Ethics Committee.</p>
+    
+    <h3>Contact information</h3>
+    <p>If you have any questions about this research, please contact: [Researcher Email]</p>
+  `;
+  
+  // Try to load external information text file if available, otherwise use default
+  try {
+    const response = await fetch('participant_information.txt');
+    if (response.ok) {
+      const infoHtml = await response.text();
+      show(`
+        <div class="info-container">
+            ${infoHtml}
+            <div class="button-container">
+                <a href="PIS.pdf" download="PIS.pdf" target="_blank" rel="noopener noreferrer" style="text-decoration: none;"><button>Download Information Sheet (PDF)</button></a>
+                <button id="next_btn">Next</button>
+            </div>
+        </div>
+      `);
+    } else {
+      // Use default information if file not found
+      show(`
+        <div class="info-container">
+            ${participantInfoHTML}
+            <div class="button-container">
+                <button id="next_btn">Next</button>
+            </div>
+        </div>
+      `);
+    }
+  } catch (e) {
+    // Use default information if there's an error
+    console.error('Failed to load participant information file:', e);
+    show(`
+      <div class="info-container">
+          ${participantInfoHTML}
+          <div class="button-container">
+              <button id="next_btn">Next</button>
+          </div>
+      </div>
+    `);
+  }
+
+  await new Promise(resolve => { document.getElementById('next_btn').onclick = resolve; });
+
+  // Function to show rejection message when participant is not eligible or does not consent
+  const showRejectionMessage = () => {
+    show(`
+      <div class="questionnaire-container">
+        <p>Thank you for your interest. As you do not meet the eligibility criteria or do not wish to consent, you cannot proceed with the study.</p>
+        <p>Please return your submission on the Prolific website. You may now close this window.</p>
+      </div>
+    `);
+  };
+
+  // Age verification
+  show(`
+    <div class="questionnaire-container">
+      <p class="question-text">Are you over 18 years of age?</p>
+      <button id="yes_btn">Yes</button> <button id="no_btn">No</button>
+    </div>
+  `);
+  
+  const isOver18 = await new Promise(resolve => {
+    document.getElementById('yes_btn').onclick = () => resolve(true);
+    document.getElementById('no_btn').onclick = () => resolve(false);
+  });
+
+  if (!isOver18) {
+    showRejectionMessage();
+    return false;
+  }
+
+  // Consent confirmation
+  show(`
+    <div class="questionnaire-container">
+      <p class="question-text">Do you consent to participate in the study?</p>
+      <button id="yes_btn">Yes</button> <button id="no_btn">No</button>
+    </div>
+  `);
+  
+  const hasConsented = await new Promise(resolve => {
+    document.getElementById('yes_btn').onclick = () => resolve(true);
+    document.getElementById('no_btn').onclick = () => resolve(false);
+  });
+
+  if (!hasConsented) {
+    showRejectionMessage();
+    return false;
+  }
+
+  return true; // Consent given
+}
+
 // ------------------- STIMULUS LOADER (MODIFIED TO INCLUDE AVG_FAVORABILITY) -------------------
 async function loadCSVStimuli(){
   const response = await fetch(CONFIG.csvFile);
@@ -511,7 +638,7 @@ async function introScreen(){
   });
 }
 
-// ------------------- NEW DEMOGRAPHICS SCREEN (REMOVED TITLES) -------------------
+// ------------------- DEMOGRAPHICS SCREEN (NO TITLE HEADERS) -------------------
 async function runDemographics() {
   // 1. Age question
   show(`
@@ -616,7 +743,7 @@ async function runDemographics() {
     };
   });
   
-  // 4. Political orientation (moved from intro screen)
+  // 4. Political orientation
   show(`
     <div class="questionnaire-container">
       <p class="question-text">Please select your political orientation:</p>
@@ -999,11 +1126,21 @@ function finishExperiment(){
     show('<h2>Loading experiment configuration...</h2>');
     await loadCSVStimuli(); 
     
-    await introScreen(); // Collect Prolific ID
-    await runDemographics(); // Collect demographics, political orientation, and headline type
+    // First show information sheet and get consent
+    const consentGiven = await showInformationAndConsent();
+    if (!consentGiven) {
+      // Stop the experiment if consent was not given
+      return;
+    }
+    
+    // Then collect Prolific ID
+    await introScreen();
+    
+    // Then collect demographics
+    await runDemographics();
     
     show('<h2>Preparing experiment trials...</h2>');
-    prepareExperimentTrials(); // Now includes all statements of chosen headline type
+    prepareExperimentTrials();
     
     await showInstructionsScreen();
     await runPracticeBlock();
