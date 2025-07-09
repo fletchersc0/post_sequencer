@@ -98,22 +98,10 @@
       font-size: 1.2rem;
       margin: 1em 0;
     }
-    .session-info {
-      position: fixed;
-      bottom: 10px;
-      left: 10px;
-      font-size: 0.8rem;
-      color: #666;
-      text-align: left;
-    }
   </style>
 </head>
 <body>
   <div id="stage">Loading experiment...</div>
-  <div class="session-info">
-    Current Date and Time (UTC): 2025-07-09 02:27:13<br>
-    User: fletchersc0
-  </div>
 
 <script>
 // -------------------- CONFIG --------------------
@@ -136,9 +124,8 @@ const CONFIG = {
   numPracticeTrials      : 4,
   trialsPerBreak         : 16, // Break every 16 statements (reasonable for 64 total)
 
-  // Session info
-  sessionDate            : '2025-07-09 02:27:13',
-  userLogin              : 'fletchersc0',
+  // Session info (for data logging only)
+  sessionDate            : '2025-07-09 02:37:23',
 
   // headline types, truthValues, congruenceLevels for structure definition
   headlineTypes          : ['Clickbait', 'Not Clickbait'],
@@ -198,7 +185,7 @@ const CONFIG = {
     'response', 'accuracy', 'rt_ms',
     'avg_favorability', // Added new column for data export
     'age', 'gender', 'education', // Added demographic variables
-    'session_date', 'user_login', // Added session info variables
+    'session_date', // Session date for logging
     'timestamp'
   ]
 };
@@ -217,7 +204,6 @@ const state = {
   
   // Session info
   sessionDate             : CONFIG.sessionDate,
-  userLogin               : CONFIG.userLogin,
   
   allStimuli              : [], 
   practiceStimuli         : [], 
@@ -278,9 +264,8 @@ function log(dataRow) {
   dataRow.gender = state.gender;
   dataRow.education = state.education;
   
-  // Add session info to every row
+  // Add session date to every row
   dataRow.session_date = state.sessionDate;
-  dataRow.user_login = state.userLogin;
   
   const completeRow = {};
   CONFIG.masterHeader.forEach(header => {
