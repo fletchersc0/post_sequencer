@@ -125,7 +125,8 @@ const CONFIG = {
   trialsPerBreak         : 16, // Break every 16 statements (reasonable for 64 total)
 
   // Session info (for data logging only)
-  sessionDate            : '2025-07-09 02:37:23',
+  sessionDate            : '2025-07-09 02:49:40',
+  userLogin              : 'fletchersc0',
 
   // headline types, truthValues, congruenceLevels for structure definition
   headlineTypes          : ['Clickbait', 'Not Clickbait'],
@@ -185,7 +186,7 @@ const CONFIG = {
     'response', 'accuracy', 'rt_ms',
     'avg_favorability', // Added new column for data export
     'age', 'gender', 'education', // Added demographic variables
-    'session_date', // Session date for logging
+    'session_date', 'user_login', // Session info for data logging
     'timestamp'
   ]
 };
@@ -194,7 +195,7 @@ const CONFIG = {
 const state = {
   prolificID              : '',
   politicalOrientation    : '',
-  participantHeadlineType : '',
+  participantHeadlineType : '', // Will be randomly assigned after demographics
   keyAssignment           : '', // Will store which key is assigned to "true"
   
   // Added demographic variables to state
@@ -204,6 +205,7 @@ const state = {
   
   // Session info
   sessionDate             : CONFIG.sessionDate,
+  userLogin               : CONFIG.userLogin,
   
   allStimuli              : [], 
   practiceStimuli         : [], 
@@ -264,8 +266,9 @@ function log(dataRow) {
   dataRow.gender = state.gender;
   dataRow.education = state.education;
   
-  // Add session date to every row
+  // Add session info to every row
   dataRow.session_date = state.sessionDate;
+  dataRow.user_login = state.userLogin;
   
   const completeRow = {};
   CONFIG.masterHeader.forEach(header => {
@@ -570,26 +573,26 @@ function waitKeysOrTimeout(validKeys, timeoutMs) {
   });
 }
 
-// ------------------- STIMULUS PREPARATION (MODIFIED TO INCLUDE ALL STATEMENTS OF CHOSEN TYPE) -------------------
+// ------------------- STIMULUS PREPARATION (MODIFIED TO USE RANDOMLY ASSIGNED HEADLINE TYPE) -------------------
 function prepareExperimentTrials() {
     if (state.allStimuli.length === 0) {
         throw new Error("No stimuli loaded. Cannot prepare trials.");
     }
     if (!state.participantHeadlineType) {
-        throw new Error("Participant headline type not selected. Cannot prepare trials.");
+        throw new Error("Headline type not assigned. Cannot prepare trials.");
     }
     
     // 1. Use predefined practice trials
     state.practiceStimuli = [...CONFIG.practiceTrials];
     shuffle(state.practiceStimuli);
     
-    // 2. Filter by participant's chosen headline type (but include ALL statements of that type)
+    // 2. Filter by participant's assigned headline type (but include ALL statements of that type)
     const headlineTypeFilteredStimuli = state.allStimuli.filter(
         stim => stim.headline_type === state.participantHeadlineType
     );
     
     if (headlineTypeFilteredStimuli.length === 0) {
-        throw new Error(`No stimuli found for the selected headline type: '${state.participantHeadlineType}'. Check CSV content and distribution.`);
+        throw new Error(`No stimuli found for the assigned headline type: '${state.participantHeadlineType}'. Check CSV content and distribution.`);
     }
     
     // 3. Assign Congruence for all stimuli based on participant's political orientation
@@ -607,7 +610,7 @@ function prepareExperimentTrials() {
             congruence = 'ErrorCongruence'; 
         }
         
-        // Add all stimuli of the chosen headline type to main experiment with congruence assigned
+        // Add all stimuli of the assigned headline type to main experiment with congruence assigned
         state.mainExperimentStimuli.push({...stim, partisan_congruence: congruence});
     });
     
@@ -648,7 +651,7 @@ async function introScreen(){
   });
 }
 
-// ------------------- DEMOGRAPHICS SCREEN (NO TITLE HEADERS) -------------------
+// ------------------- DEMOGRAPHICS SCREEN (REMOVED HEADLINE TYPE SELECTION) -------------------
 async function runDemographics() {
   // 1. Age question
   show(`
@@ -777,36 +780,12 @@ async function runDemographics() {
     };
   });
   
-  // 5. Headline type selection
-  show(`
-    <div class="questionnaire-container">
-      <p class="question-text">Please select your headline type focus for this session:</p>
-      <select id="headline_select">
-        <option value="" disabled selected>Select an option</option>
-        <option value="Clickbait">Clickbait Headlines</option>
-        <option value="Not Clickbait">Non-Clickbait Headlines</option>
-      </select>
-      <button id="next_btn">Next</button>
-    </div>
-  `);
-  
-  await new Promise(resolve => {
-    document.getElementById('next_btn').onclick = () => {
-      const headlineSelect = document.getElementById('headline_select');
-      const selectedValue = headlineSelect.value;
-      
-      if (!selectedValue) {
-        alert('Please select your headline type focus.');
-        return;
-      }
-      
-      state.participantHeadlineType = selectedValue;
-      resolve();
-    };
-  });
+  // After demographics, randomly assign participant to a headline type condition
+  state.participantHeadlineType = Math.random() < 0.5 ? 'Clickbait' : 'Not Clickbait';
+  console.log(`Participant randomly assigned to headline type: ${state.participantHeadlineType}`);
 }
 
-// ------------------- INSTRUCTIONS SCREEN (UPDATED FOR Q/P KEYS WITH CONSISTENT LAYOUT) -------------------
+// ------------------- INSTRUCTIONS SCREEN (UPDATED TO BE GENERIC WITHOUT REVEALING HEADLINE TYPE) -------------------
 async function showInstructionsScreen() {
     show(`
         <div class="message-container">
@@ -829,7 +808,7 @@ async function showInstructionsScreen() {
                 There will be a short practice session first. 
                 During the main experiment, there will be no feedback, and there will be short breaks every 16 trials.
                 <br><br>
-                <strong>Important:</strong> In this experiment, you will see approximately 64 ${state.participantHeadlineType} headlines.
+                <strong>Important:</strong> In this experiment, you will see approximately 64 headlines.
             </p>
             <button id="startPracticeBtn">Start Practice</button>
         </div>
@@ -917,7 +896,7 @@ async function runSingleTrial(stimulus, isPracticeTrial = false) {
   await sleep(itiDuration);
 }
 
-// ------------------- BLOCKS & EXPERIMENT FLOW (UPDATED WITH CONSISTENT KEY REMINDER) -------------------
+// ------------------- BLOCKS & EXPERIMENT FLOW (UPDATED WITH GENERIC INSTRUCTIONS) -------------------
 async function runPracticeBlock() {
     state.currentBlock = 'Practice';
     state.currentTrialInBlock = 0;
@@ -1034,7 +1013,7 @@ async function runPracticeBlock() {
       <h2>End of Practice</h2>
       <p>You have completed the practice round. Now you will move on to the main experiment with political headlines.</p>
       <p>Remember to respond within 15 seconds for each statement.</p>
-      <p>The main experiment includes approximately 64 ${state.participantHeadlineType} headlines and will take about 15-20 minutes.</p>
+      <p>The main experiment includes approximately 64 headlines and will take about 15-20 minutes.</p>
       <p>Remember:</p>
       ${getKeyReminderHTML()}
       <button id="startMainBtn">Start Main Experiment</button>
@@ -1052,7 +1031,7 @@ async function runMainExperimentBlock() {
       <p>The main experiment will now begin. Remember to respond as quickly and accurately as possible.<br>
       You have 15 seconds to respond to each statement.<br>
       There will be short breaks every 16 trials.</p>
-      <p>You will see approximately 64 ${state.participantHeadlineType} headlines.</p>
+      <p>You will see approximately 64 headlines.</p>
       <p>Remember:</p>
       ${getKeyReminderHTML()}
       <p>Press SPACE to begin.</p>
@@ -1060,7 +1039,7 @@ async function runMainExperimentBlock() {
     await waitKeys([' ']);
     
     if (state.mainExperimentStimuli.length === 0) {
-        show(`<div class="message-container"><p class="error-text">No main experiment stimuli available for the selected headline type. Please check configuration and CSV processing.</p></div>`);
+        show(`<div class="message-container"><p class="error-text">No main experiment stimuli available for the assigned headline type. Please check configuration and CSV processing.</p></div>`);
         return Promise.reject("No main stimuli available");
     }
     
@@ -1142,7 +1121,7 @@ function finishExperiment(){
     // Then collect Prolific ID
     await introScreen();
     
-    // Then collect demographics
+    // Then collect demographics and randomly assign headline type
     await runDemographics();
     
     show('<h2>Preparing experiment trials...</h2>');
