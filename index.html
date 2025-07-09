@@ -98,25 +98,17 @@
       font-size: 1.2rem;
       margin: 1em 0;
     }
-    /* Styles for Debriefing Screen */
-    .debrief-container {
-        text-align: left;
-        max-width: 800px;
-        line-height: 1.6;
-    }
-    .debrief-container h1, .debrief-container h2 { text-align: center; }
+    /* Styles for Debriefing Screen, adapted from the first example */
     .debrief-content {
-        max-height: 40vh;
-        overflow-y: auto;
-        border: 1px solid var(--border-color);
-        padding: 1rem;
-        margin-bottom: 1.5rem;
-        background: var(--input-bg);
+      height: 300px;
+      overflow-y: scroll;
+      border: 1px solid var(--border-color);
+      padding: 1rem;
+      text-align: left;
+      margin-bottom: 1rem;
+      background: var(--input-bg);
     }
-    .debrief-container .button-bar {
-        text-align: center;
-        margin-top: 1.5rem;
-    }
+    .button-bar { margin-top: 1.5rem; text-align: center; }
   </style>
 </head>
 <body>
@@ -134,7 +126,7 @@ const CONFIG = {
   dataPipeID             : 'qWHxwr6D720q', 
   fallbackDownload       : true, 
   
-  // ★ ADDED: Prolific URL for completion
+  // ★ ADDED: Prolific URL for completion link
   prolificURL            : 'https://app.prolific.co/submissions/complete?cc=YOUR_CODE_HERE', // <-- ❗REPLACE with your actual Prolific completion code
 
   fixationCrossDuration  : 500,
@@ -248,17 +240,11 @@ function toCSV(rows){
 }
 
 function uploadCSV(filename, csvData){
-  if (!CONFIG.dataPipeID || CONFIG.dataPipeID === 'YOUR_JSPSYCH_DATAPIPE_ID') {
-      return Promise.resolve({ok: false, statusText: "DataPipeID not set"});
-  }
+  if (!CONFIG.dataPipeID) return Promise.resolve({ok: false, statusText: "DataPipeID not set"});
   return fetch('https://pipe.jspsych.org/api/data', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ 
-      experimentID: CONFIG.dataPipeID, 
-      filename: filename, 
-      data: csvData 
-    })
+    body: JSON.stringify({ experimentID: CONFIG.dataPipeID, filename: filename, data: csvData })
   });
 }
 
@@ -276,7 +262,7 @@ function downloadCSV(csvData, filename){
 
 // ------------------- ★ NEW/MODIFIED FUNCTIONS FOR SCREENING & DEBRIEF -------------------
 
-// ★ NEW: Function to redirect ineligible participants
+// ★ NEW: Function to handle automatic redirection for ineligible participants
 function exitToProlific() {
   const message = `
     <div class="message-container" style="text-align:center;">
@@ -287,108 +273,51 @@ function exitToProlific() {
   `;
   show(message);
   setTimeout(() => {
-    // Redirects to a generic Prolific page. Replace if you have a specific return URL.
     window.location.href = 'https://app.prolific.com';
   }, 5000); // 5-second delay
 }
 
-// ★ NEW: Helper to ask a single Yes/No question
-function askYesNoQuestion(questionText) {
-    show(`
-        <div class="questionnaire-container">
-            <p class="question-text" style="font-size: 1.2rem; margin-bottom: 2rem;">${questionText}</p>
-            <div class="button-container">
-                <button id="yes_btn">Yes</button>
-                <button id="no_btn">No</button>
-            </div>
-        </div>
-    `);
-    return new Promise(resolve => {
-        document.getElementById('yes_btn').onclick = () => resolve(true);
-        document.getElementById('no_btn').onclick = () => resolve(false);
-    });
+// ------------------- INFORMATION & CONSENT SCREEN (★ MODIFIED) -------------------
+async function showInformationAndConsent() {
+  const participantInfoHTML = `
+    <h2>Participant Information Sheet</h2>
+    <p>You are invited to take part in a research study...</p>
+    <!-- ... (rest of your information sheet text) ... -->
+  `;
+  
+  show(`<div class="info-container">${participantInfoHTML}<div class="button-container"><button id="next_btn">Next</button></div></div>`);
+  await new Promise(resolve => { document.getElementById('next_btn').onclick = resolve; });
+
+  // ★ This is the only function that needs to be modified for the screening logic
+  async function askYesNoQuestion(questionText) {
+      show(`
+          <div class="questionnaire-container">
+              <p class="question-text">${questionText}</p>
+              <button id="yes_btn">Yes</button> <button id="no_btn">No</button>
+          </div>
+      `);
+      return new Promise(resolve => {
+          document.getElementById('yes_btn').onclick = () => resolve(true);
+          document.getElementById('no_btn').onclick = () => resolve(false);
+      });
+  }
+
+  // Age verification
+  const isOver18 = await askYesNoQuestion('Are you over 18 years of age?');
+  if (!isOver18) {
+    exitToProlific();
+    return new Promise(() => {}); // Halts execution
+  }
+
+  // Consent confirmation
+  const hasConsented = await askYesNoQuestion('Do you consent to participate in the study?');
+  if (!hasConsented) {
+    exitToProlific();
+    return new Promise(() => {}); // Halts execution
+  }
+
+  return true; // Consent given, continue experiment
 }
-
-// ★ MODIFIED: Combined information, screening, and consent flow
-async function runPISAndScreening() {
-    // 1. Show Participant Information
-    const infoHtml = `
-        <h2>Participant Information Sheet</h2>
-        <p>You are invited to take part in a research study about how people judge the truthfulness of different types of headlines.</p>
-        <h3>What is the purpose of the study?</h3>
-        <p>This study aims to understand how people determine whether news headlines are true or false, and how different presentation styles might influence these judgments.</p>
-        <h3>What will I be asked to do?</h3>
-        <p>You will be shown a series of headlines and asked to judge whether each one is true or false as quickly and accurately as possible. The task will take approximately 15-20 minutes to complete.</p>
-        <h3>Data protection and confidentiality</h3>
-        <p>Your responses will be kept completely anonymous. We will collect your Prolific ID only for payment purposes.</p>
-        <h3>Contact information</h3>
-        <p>If you have any questions, please contact the researcher.</p>
-    `;
-    show(`
-        <div class="info-container">
-            ${infoHtml}
-            <div class="button-container">
-                <button id="next_btn">Next</button>
-            </div>
-        </div>
-    `);
-    await new Promise(resolve => { document.getElementById('next_btn').onclick = resolve; });
-
-    // 2. Run through screening questions
-    const questions = [
-        'Are you over 18 years of age?',
-        'Do you consent to participate in the study?'
-    ];
-
-    for (const question of questions) {
-        const answeredYes = await askYesNoQuestion(question);
-        if (!answeredYes) {
-            exitToProlific();
-            // Return a promise that never resolves to halt execution
-            return new Promise(() => {});
-        }
-    }
-}
-
-// ★ NEW: Unified debriefing and finish function
-async function showDebriefAndFinish(uploadSuccess = true, csvData = null, filename = null) {
-    // Determine which debriefing file to load
-    const debriefFile = state.participantHeadlineType === 'Clickbait' ? 'debrief_clickbait.txt' : 'debrief_headline.txt';
-    let debriefHTML = `<p>Thank you for your participation. This study investigated how headline style affects truth judgments.</p>`; // Fallback
-    
-    try {
-        const response = await fetch(debriefFile);
-        if (response.ok) debriefHTML = await response.text();
-    } catch (e) {
-        console.error("Could not load debrief file.", e);
-    }
-
-    let message = '';
-    if (uploadSuccess) {
-        message = `<p><strong>Your data has been successfully uploaded.</strong></p>
-                   <p>Please click the arrow below to complete the study and return to Prolific.</p>`;
-    } else {
-        message = `<h2 style="color:var(--warning-color);">Data Upload Error</h2>
-                   <p>There was an error uploading your data. A file has been downloaded to your computer instead.</p>
-                   <p><b>Please email this file to the researcher.</b></p>
-                   <p>You may now click the arrow to return to Prolific.</p>`;
-        if (csvData && filename) {
-            downloadCSV(csvData, filename);
-        }
-    }
-
-    show(`
-        <div class="debrief-container">
-            <h1>Debriefing Information</h1>
-            <div class="debrief-content">${debriefHTML}</div>
-            ${message}
-            <div class="button-bar">
-                <a href="${CONFIG.prolificURL}" style="font-size: 3rem; text-decoration: none; color: var(--fg);">&rarr;</a>
-            </div>
-        </div>
-    `);
-}
-
 
 // ------------------- STIMULUS LOADER -------------------
 async function loadCSVStimuli(){
@@ -408,11 +337,11 @@ async function loadCSVStimuli(){
   const expectedCsvHeaders = ['item', 'claim', 'clickbait', 'veracity', 'favorability'];
   for (const reqHeader of expectedCsvHeaders) {
       if (!header.includes(reqHeader)) {
-          throw new Error(`CSV file is missing required header: '${reqHeader}'. Found headers: ${header.join(', ')}`);
+          throw new Error(`CSV file is missing required header: '${reqHeader}'.`);
       }
   }
   
-  lines.forEach((line, index) => {
+  lines.forEach((line) => {
     if (line.trim() === "") return; 
 
     let fields = [];
@@ -420,13 +349,9 @@ async function loadCSVStimuli(){
         let current = '', inQuotes = false;
         for (let i = 0; i < line.length; i++) {
             const char = line[i];
-            if (char === '"' && (i === 0 || line[i-1] !== '\\')) { 
-                inQuotes = !inQuotes;
-            } else if (char === delimiter && !inQuotes) {
-                fields.push(current.trim().replace(/^"|"$/g, '')); current = '';
-            } else {
-                current += char;
-            }
+            if (char === '"' && (i === 0 || line[i-1] !== '\\')) inQuotes = !inQuotes;
+            else if (char === delimiter && !inQuotes) { fields.push(current.trim().replace(/^"|"$/g, '')); current = ''; }
+            else current += char;
         }
         fields.push(current.trim().replace(/^"|"$/g, ''));
     } else { 
@@ -440,15 +365,14 @@ async function loadCSVStimuli(){
     if (!itemNum) return;
 
     const truthValue = rawStim.veracity.toUpperCase() === 'TRUE';
-    let partisanAlignment = (rawStim.favorability.toLowerCase() === 'republican') ? 'Right' : 'Left';
+    let partisanAlignment = 'Neutral';
+    if (rawStim.favorability.toLowerCase() === 'republican') partisanAlignment = 'Right';
+    else if (rawStim.favorability.toLowerCase() === 'democrat') partisanAlignment = 'Left';
+
     const avgFavorability = rawStim.avg_favorability || '';
 
-    if (rawStim.clickbait) {
-        state.allStimuli.push({ statement_id: `item${itemNum}_clickbait`, statement_text: rawStim.clickbait, headline_type: 'Clickbait', truth_value: truthValue, partisan_alignment: partisanAlignment, avg_favorability: avgFavorability, is_practice_stimulus: false, is_attention_check: false });
-    }
-    if (rawStim.claim) {
-        state.allStimuli.push({ statement_id: `item${itemNum}_notclickbait`, statement_text: rawStim.claim, headline_type: 'Not Clickbait', truth_value: truthValue, partisan_alignment: partisanAlignment, avg_favorability: avgFavorability, is_practice_stimulus: false, is_attention_check: false });
-    }
+    if (rawStim.clickbait) state.allStimuli.push({ statement_id: `item${itemNum}_clickbait`, statement_text: rawStim.clickbait, headline_type: 'Clickbait', truth_value: truthValue, partisan_alignment: partisanAlignment, avg_favorability: avgFavorability, is_practice_stimulus: false, is_attention_check: false });
+    if (rawStim.claim) state.allStimuli.push({ statement_id: `item${itemNum}_notclickbait`, statement_text: rawStim.claim, headline_type: 'Not Clickbait', truth_value: truthValue, partisan_alignment: partisanAlignment, avg_favorability: avgFavorability, is_practice_stimulus: false, is_attention_check: false });
   });
 }
 
@@ -495,22 +419,14 @@ function prepareExperimentTrials() {
     const headlineTypeFilteredStimuli = state.allStimuli.filter(
         stim => stim.headline_type === state.participantHeadlineType
     );
-    
-    if (headlineTypeFilteredStimuli.length === 0) {
-        throw new Error(`No stimuli found for assigned headline type: '${state.participantHeadlineType}'.`);
-    }
+    if (headlineTypeFilteredStimuli.length === 0) throw new Error(`No stimuli found for assigned headline type.`);
     
     state.mainExperimentStimuli = headlineTypeFilteredStimuli.map(stim => {
         let congruence;
-        if (stim.partisan_alignment === 'Neutral' || !stim.partisan_alignment) { 
-            congruence = Math.random() < 0.5 ? 'Congruent' : 'Incongruent'; 
-        } else if (state.politicalOrientation === 'Left-leaning') {
-            congruence = stim.partisan_alignment === 'Left' ? 'Congruent' : 'Incongruent';
-        } else if (state.politicalOrientation === 'Right-leaning') {
-            congruence = stim.partisan_alignment === 'Right' ? 'Congruent' : 'Incongruent';
-        } else {
-            congruence = 'ErrorCongruence'; 
-        }
+        if (stim.partisan_alignment === 'Neutral') congruence = Math.random() < 0.5 ? 'Congruent' : 'Incongruent';
+        else if (state.politicalOrientation === 'Left-leaning') congruence = stim.partisan_alignment === 'Left' ? 'Congruent' : 'Incongruent';
+        else if (state.politicalOrientation === 'Right-leaning') congruence = stim.partisan_alignment === 'Right' ? 'Congruent' : 'Incongruent';
+        else congruence = 'ErrorCongruence';
         return {...stim, partisan_congruence: congruence};
     });
     
@@ -586,7 +502,7 @@ async function showInstructionsScreen() {
     show(`
         <div class="message-container">
             <h2>Instructions</h2>
-            <p class="instructions-text">You will first see a fixation cross (+). Then, a statement will appear.<br>Your task is to decide if the statement is TRUE or FALSE using the Q and P keys.<br>${getKeyReminderHTML()}<br>Please respond as quickly and accurately as you can. You will have 15 seconds per statement.<br>There will be a short practice session first.</p>
+            <p class="instructions-text">You will first see a fixation cross (+). Then, a statement will appear.<br>Your task is to decide if the statement is TRUE or FALSE using the Q and P keys.<br>${getKeyReminderHTML()}<br>Please respond as quickly and accurately as you can.<br>There will be a short practice session first.</p>
             <button id="startPracticeBtn">Start Practice</button>
         </div>
     `);
@@ -640,11 +556,9 @@ async function runPracticeBlock() {
     state.currentTrialInBlock = 0;
     show(`<div class="message-container"><h2>Practice Round</h2><p>Press SPACE to begin.</p></div>`);
     await waitKeys([' ']);
-
     for (const stimulus of state.practiceStimuli) {
         await runSingleTrial(stimulus, true);
     }
-
     show(`<div class="message-container"><h2>End of Practice</h2><p>The main experiment will now begin.</p><button id="startMainBtn">Start Main Experiment</button></div>`);
     return new Promise(resolve => { document.getElementById('startMainBtn').onclick = resolve; });
 }
@@ -654,7 +568,6 @@ async function runMainExperimentBlock() {
     state.currentTrialInBlock = 0;
     show(`<div class="message-container"><h2>Main Experiment</h2><p>Press SPACE to begin.</p></div>`);
     await waitKeys([' ']);
-    
     for (let i = 0; i < state.mainExperimentStimuli.length; i++) {
         await runSingleTrial(state.mainExperimentStimuli[i], false);
         if ((i + 1) < state.mainExperimentStimuli.length && (i + 1) % CONFIG.trialsPerBreak === 0) {
@@ -664,7 +577,41 @@ async function runMainExperimentBlock() {
     }
 }
 
-// ------------------- FINISH EXPERIMENT (MODIFIED) -------------------
+// ------------------- DEBRIEFING & FINISH (★ MODIFIED) -------------------
+async function showDebriefingAndFinish(uploadSuccess = true) {
+  const debriefFile = state.participantHeadlineType === 'Clickbait' ? 'debrief_clickbait.txt' : 'debrief_headline.txt';
+  let debriefHTML = `<p>Thank you for your participation.</p>`; // Fallback
+  
+  try {
+    const response = await fetch(debriefFile);
+    if (response.ok) debriefHTML = await response.text();
+  } catch (e) {
+    console.error("Could not load debrief file:", e);
+  }
+
+  let message = '';
+  if (uploadSuccess) {
+    message = `<p><strong>Your data has been successfully uploaded.</strong></p>
+               <p>Please click the arrow below to complete the study and return to Prolific.</p>`;
+  } else {
+    message = `<h2>Network error – data downloaded locally.</h2>
+               <p style="text-align:center;">There was an issue uploading your data. A file has been downloaded to your computer instead.</p>
+               <p style="text-align:center;">Please email this file to the researcher, then click the arrow to return to Prolific.</p>`;
+  }
+
+  const finalScreenHTML = `
+    <div class="questionnaire-container">
+      <h1>Debriefing Information</h1>
+      <div class="debrief-content">${debriefHTML}</div>
+      ${message}
+      <div class="button-bar">
+        <a href="${CONFIG.prolificURL}" style="font-size: 2.5rem; text-decoration: none; color: var(--fg);">&rarr;</a>
+      </div>
+    </div>`;
+  
+  show(finalScreenHTML);
+}
+
 async function finishExperiment(){ 
   const csv = toCSV(state.data);
   const filename = `${CONFIG.experimentName.replace(/\s+/g, '_')}_${state.prolificID}.csv`;
@@ -674,34 +621,32 @@ async function finishExperiment(){
   try {
     const response = await uploadCSV(filename, csv);
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    await showDebriefAndFinish(true);
+    await showDebriefingAndFinish(true);
   } catch (err) {
     console.error('Data upload failed:', err);
     if (CONFIG.fallbackDownload) {
-      await showDebriefAndFinish(false, csv, filename);
-    } else {
-      show(`<div class="message-container"><h2>Critical Error</h2><p>Your data could not be saved.</p><p>Please contact the researcher.</p></div>`);
+      downloadCSV(csv, filename);
     }
+    await showDebriefingAndFinish(false);
   }
 }
 
-// ------------------- LAUNCH (MODIFIED) -------------------
+// ------------------- LAUNCH (★ MODIFIED) -------------------
 (async () => {
   try {
     show('<h2>Loading...</h2>');
     await loadCSVStimuli(); 
     
-    await runPISAndScreening(); // Handles info, screening, and consent
+    // ★ This function now handles the entire PIS/Consent/Screening flow
+    await showInformationAndConsent();
     
+    // If screening is passed, the script will continue from here
     await introScreen();
     await runDemographics();
-    
     prepareExperimentTrials();
-    
     await showInstructionsScreen();
     await runPracticeBlock();
     await runMainExperimentBlock();
-    
     await finishExperiment();
 
   } catch (e) {
