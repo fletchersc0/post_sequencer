@@ -1180,13 +1180,11 @@ async function runPracticeBlock() {
     }
 
     show(`<div class="message-container">
-      <h2>End of Practice</h2>
-      <p>You have completed the practice round. Now you will move on to the main experiment with political headlines.</p>
-      <p>Remember to respond within 15 seconds for each statement.</p>
-      <p>The main experiment includes approximately 64 headlines and will take about 15-20 minutes.</p>
+      <h2>Practice Complete!</h2>
+      <p>Now you will move on to the main task.</p>
       <p>Remember:</p>
       ${getKeyReminderHTML()}
-      <button id="startMainBtn">Start Main Experiment</button>
+      <button id="startMainBtn">Continue to main experiment</button>
     </div>`);
     return new Promise(resolve => {
         document.getElementById('startMainBtn').onclick = resolve;
@@ -1198,10 +1196,8 @@ async function runMainExperimentBlock() {
     state.currentTrialInBlock = 0;
     show(`<div class="message-container">
       <h2>Main Experiment</h2>
-      <p>The main experiment will now begin. Remember to respond as quickly and accurately as possible.<br>
-      You have 15 seconds to respond to each statement.<br>
-      There will be short breaks every 16 trials.</p>
-      <p>You will see approximately 64 headlines.</p>
+      <p>The main experiment will now begin. Answer as <strong>quickly</strong> and as <strong>accurately</strong> as possible.</p>
+      <p>You have 15 seconds to respond to each statement.</p>
       <p>Remember:</p>
       ${getKeyReminderHTML()}
       <p>Press SPACE to begin.</p>
