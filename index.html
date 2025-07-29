@@ -966,26 +966,22 @@ async function showInstructionsScreen() {
         <div class="message-container">
             <h2>Instructions</h2>
             <p class="instructions-text">
-                You will first see a fixation cross (+) in the center of the screen. Please focus on it.
+                Welcome to this session. Please turn off your phone.
                 <br><br>
-                Then, a statement will appear.
+                Please read the following instructions carefully. They contain everything you need to know before we begin.
                 <br><br>
-                Your task is to decide if the statement is TRUE or FALSE.
+                Throughout the task you will use your keyboard to respond. On each trial you will see <strong>one news claim</strong>. Some claims are accurate and others are not.
+                <br><br>
+                Your task:</strong> press the key that corresponds to whether you believe the claim is <em>True</em> or <em>False</em>. Answer as <strong>quickly</strong> and as <strong>accurately</strong> as possible. Once an entry has been made, it is no longer possible to re-enter.
                 <br><br>
                 Respond using the Q and P keys:
                 <br><br>
                 ${getKeyReminderHTML()}
+                You will have 15 seconds to respond to each statement.
                 <br><br>
-                Please respond as quickly and as accurately as you can. You will have 15 seconds to respond to each statement.
-                <br><br>
-                If you don't respond within 15 seconds, you will see a message asking you to respond faster.
-                <br><br>
-                There will be a short practice session first. 
-                During the main experiment, there will be no feedback, and there will be short breaks every 16 trials.
-                <br><br>
-                <strong>Important:</strong> In this experiment, you will see approximately 64 headlines.
+                Place your fingers on the keys now. We will do a practice round first.
             </p>
-            <button id="startPracticeBtn">Start Practice</button>
+            <button id="startPracticeBtn">Continue to practice</button>
         </div>
     `);
     return new Promise(resolve => {
