@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta http-equiv="X-UA-Compatible" content="IE=edge" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Truth Judgment Task (Complete Statement Set)</title>
+  <title>Rapid fact-checking of news</title>
 
   <style>
     :root {
@@ -170,7 +170,7 @@
 // Current User's Login: fletchersc0
 
 const CONFIG = {
-  experimentName         : 'Political Truth Judgment Task (Complete Statement Set)',
+  experimentName         : 'Rapid fact-checking of news',
   csvFile                : 'stimulus_master.csv', 
   // Response keys will be assigned randomly at startup
   responseKeys           : { 
@@ -203,7 +203,7 @@ const CONFIG = {
   practiceTrials         : [
     {
       statement_id: 'practice_fact_1',
-      statement_text: 'Water freezes at 0 degrees Celsius at standard atmospheric pressure.',
+      statement_text: 'The American flag has 50 stars, one for each U.S. state.',
       headline_type: 'Not Clickbait',
       truth_value: true,
       partisan_alignment: 'Neutral',
@@ -213,7 +213,7 @@ const CONFIG = {
     },
     {
       statement_id: 'practice_fact_2',
-      statement_text: 'The Earth orbits around the Sun, completing one orbit approximately every 365 days.',
+      statement_text: 'Humans need oxygen to survive.',
       headline_type: 'Not Clickbait',
       truth_value: true,
       partisan_alignment: 'Neutral',
@@ -223,7 +223,7 @@ const CONFIG = {
     },
     {
       statement_id: 'practice_myth_1',
-      statement_text: 'Humans only use 10% of their brains in daily life.',
+      statement_text: 'The Sun revolves around the Earth each day.',
       headline_type: 'Clickbait',
       truth_value: false,
       partisan_alignment: 'Neutral',
@@ -233,7 +233,7 @@ const CONFIG = {
     },
     {
       statement_id: 'practice_myth_2',
-      statement_text: 'The Great Wall of China is the only human-made structure visible from the Moon with the naked eye.',
+      statement_text: 'New York City is the capital of the United States.',
       headline_type: 'Clickbait',
       truth_value: false,
       partisan_alignment: 'Neutral',
