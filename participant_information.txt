@@ -47,7 +47,7 @@
     <p>The entire study is expected to last about 15&nbsp;minutes. There are no costs associated with participating, and you will receive <strong>$7&nbsp;AUD</strong> for your time. If the screening questionnaire shows you do not meet the requirements, you will not be able to participate.</p>
 
     <h2>4. Other relevant information about the research project</h2>
-    <p>Approximately 200 participants will take part in the study.</p>
+    <p>Approximately 75 participants will take part in the study.</p>
 
     <h2>5. Do I have to take part in this research project?</h2>
     <p>Participation in any research project is voluntary. If you do not wish to take part, you do not have to. If you decide to take part and later change your mind, you are free to withdraw from the project at any stage.</p>
