@@ -968,7 +968,7 @@ async function showInstructionsScreen() {
             <p class="instructions-text">
                 Welcome to this session. Please turn off your phone.
                 <br><br>
-                Please read the following instructions carefully. They contain everything you need to know before we begin.
+                Please read the following instructions carefully.
                 <br><br>
                 Throughout the task you will use your keyboard to respond. On each trial you will see <strong>one news claim</strong>. Some claims are accurate and others are not.
                 <br><br>
@@ -979,7 +979,7 @@ async function showInstructionsScreen() {
                 ${getKeyReminderHTML()}
                 You will have 15 seconds to respond to each statement.
                 <br><br>
-                Place your fingers on the keys now. We will do a practice round first.
+                We will do a practice round first.
             </p>
             <button id="startPracticeBtn">Continue to practice</button>
         </div>
@@ -1075,6 +1075,7 @@ async function runPracticeBlock() {
       <p>You will now see a few practice statements that have clear correct answers.</p>
       <p>Remember:</p>
       ${getKeyReminderHTML()}
+      <p>Place your fingers on the keys now.</p>
       <p>Press SPACE to begin.</p>
     </div>`);
     await waitKeys([' ']);
