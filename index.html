@@ -166,7 +166,7 @@
 
 <script>
 // -------------------- CONFIG --------------------
-// Current Date and Time (UTC - YYYY-MM-DD HH:MM:SS formatted): 2025-07-09 06:32:43
+// Current Date and Time (UTC - YYYY-MM-DD HH:MM:SS formatted): 2025-08-18 04:45:23
 // Current User's Login: fletchersc0
 
 const CONFIG = {
@@ -685,7 +685,7 @@ function waitKeysOrTimeout(validKeys, timeoutMs) {
   });
 }
 
-// ------------------- STIMULUS PREPARATION (MODIFIED TO HANDLE MODERATES) -------------------
+// ------------------- STIMULUS PREPARATION (MODIFIED TO HANDLE PREPARATION WITHOUT POLITICAL ORIENTATION) -------------------
 function prepareExperimentTrials() {
     if (state.allStimuli.length === 0) {
         throw new Error("No stimuli loaded. Cannot prepare trials.");
@@ -707,33 +707,12 @@ function prepareExperimentTrials() {
         throw new Error(`No stimuli found for the assigned headline type: '${state.participantHeadlineType}'. Check CSV content and distribution.`);
     }
     
-    // 3. Assign Congruence for all stimuli based on participant's political orientation
+    // 3. Since we don't know political orientation yet, prepare stimuli without congruence
     state.mainExperimentStimuli = [];
     
     headlineTypeFilteredStimuli.forEach(stim => {
-        let congruence;
-        
-        // Handle congruence differently based on moderate status
-        if (stim.partisan_alignment === 'Neutral' || !stim.partisan_alignment) { 
-            // For neutral stimuli, random assignment regardless of participant orientation
-            congruence = Math.random() < 0.5 ? 'Congruent' : 'Incongruent'; 
-        } else if (state.isModerate) {
-            // For moderates, use the randomly pre-assigned direction for congruence
-            if (state.moderateCongruenceDirection === 'Left') {
-                congruence = stim.partisan_alignment === 'Left' ? 'Congruent' : 'Incongruent';
-            } else { // Right
-                congruence = stim.partisan_alignment === 'Right' ? 'Congruent' : 'Incongruent';
-            }
-        } else if (state.politicalOrientation === 'Left-leaning') {
-            congruence = stim.partisan_alignment === 'Left' ? 'Congruent' : 'Incongruent';
-        } else if (state.politicalOrientation === 'Right-leaning') {
-            congruence = stim.partisan_alignment === 'Right' ? 'Congruent' : 'Incongruent';
-        } else {
-            congruence = 'ErrorCongruence'; 
-        }
-        
-        // Add all stimuli of the assigned headline type to main experiment with congruence assigned
-        state.mainExperimentStimuli.push({...stim, partisan_congruence: congruence});
+        // We'll initially set congruence to "Pending" and update it after the political questionnaire
+        state.mainExperimentStimuli.push({...stim, partisan_congruence: 'Pending'});
     });
     
     // 4. Shuffle all stimuli for random presentation order
@@ -742,12 +721,6 @@ function prepareExperimentTrials() {
     // Store total main trials count
     state.totalMainTrials = state.mainExperimentStimuli.length;
     console.log(`Prepared ${state.totalMainTrials} main trials for headline type: ${state.participantHeadlineType}`);
-    
-    // Log congruence assignment basis for debugging
-    console.log(`Congruence assigned based on: ${state.congruenceAssignmentBasis}`);
-    if (state.isModerate) {
-        console.log(`Moderate participant assigned ${state.moderateCongruenceDirection}-leaning for congruence purposes`);
-    }
 }
 
 // ------------------- INTRO SCREEN (MODIFIED TO CONTINUE TO DEMOGRAPHICS) -------------------
@@ -775,7 +748,7 @@ async function introScreen(){
   });
 }
 
-// ------------------- DEMOGRAPHICS SCREEN (UPDATED WITH POLITICAL ORIENTATION QUESTIONNAIRE) -------------------
+// ------------------- DEMOGRAPHICS SCREEN (MODIFIED TO REMOVE POLITICAL QUESTIONS) -------------------
 async function runDemographics() {
   // 1. Age question
   show(`
@@ -876,7 +849,13 @@ async function runDemographics() {
     };
   });
   
-  // 4. Political Orientation Questionnaire (5 questions + direct orientation)
+  // After demographics, randomly assign participant to a headline type condition
+  state.participantHeadlineType = Math.random() < 0.5 ? 'Clickbait' : 'Not Clickbait';
+  console.log(`Participant randomly assigned to headline type: ${state.participantHeadlineType}`);
+}
+
+// ------------------- POLITICAL ORIENTATION QUESTIONNAIRE (NEW FUNCTION) -------------------
+async function runPoliticalQuestionnaire() {
   // Define the five political alignment questions
   const partisanshipQuestions = [
     { id: 'partisanship_q1', text: 'I am politically more in line with the Democrat party than the Republican party.' },
@@ -885,6 +864,22 @@ async function runDemographics() {
     { id: 'partisanship_q4', text: 'The major national media are too protective of the Democrat party for my taste.' },
     { id: 'partisanship_q5', text: 'On balance, I lean politically more to the left (Democrat) than to the right (Republican).' }
   ];
+
+  show(`
+    <div class="message-container">
+      <h2>Political Orientation Questionnaire</h2>
+      <p class="instructions-text">
+        Now that you've completed the main task, we'd like to ask a few questions about your political views.
+        <br><br>
+        Your responses to these questions will help us understand the relationship between political orientation and how people evaluate news headlines.
+      </p>
+      <button id="continue_btn">Continue</button>
+    </div>
+  `);
+  
+  await new Promise(resolve => {
+    document.getElementById('continue_btn').onclick = resolve;
+  });
 
   // First present the five political alignment questions
   for (const q of partisanshipQuestions) {
@@ -955,9 +950,56 @@ async function runDemographics() {
     };
   });
   
-  // After demographics, randomly assign participant to a headline type condition
-  state.participantHeadlineType = Math.random() < 0.5 ? 'Clickbait' : 'Not Clickbait';
-  console.log(`Participant randomly assigned to headline type: ${state.participantHeadlineType}`);
+  // After political orientation is determined, update congruence for all stimuli
+  updateStimuliCongruence();
+}
+
+// ------------------- FUNCTION TO UPDATE CONGRUENCE AFTER POLITICAL QUESTIONNAIRE (NEW FUNCTION) -------------------
+function updateStimuliCongruence() {
+  // Update congruence for each stimulus based on the now-known political orientation
+  state.mainExperimentStimuli.forEach(stim => {
+    let congruence;
+    
+    // Handle congruence differently based on moderate status
+    if (stim.partisan_alignment === 'Neutral' || !stim.partisan_alignment) { 
+      // For neutral stimuli, random assignment regardless of participant orientation
+      congruence = Math.random() < 0.5 ? 'Congruent' : 'Incongruent'; 
+    } else if (state.isModerate) {
+      // For moderates, use the randomly pre-assigned direction for congruence
+      if (state.moderateCongruenceDirection === 'Left') {
+        congruence = stim.partisan_alignment === 'Left' ? 'Congruent' : 'Incongruent';
+      } else { // Right
+        congruence = stim.partisan_alignment === 'Right' ? 'Congruent' : 'Incongruent';
+      }
+    } else if (state.politicalOrientation === 'Left-leaning') {
+      congruence = stim.partisan_alignment === 'Left' ? 'Congruent' : 'Incongruent';
+    } else if (state.politicalOrientation === 'Right-leaning') {
+      congruence = stim.partisan_alignment === 'Right' ? 'Congruent' : 'Incongruent';
+    } else {
+      congruence = 'ErrorCongruence'; 
+    }
+    
+    // Update the stimulus with the determined congruence
+    stim.partisan_congruence = congruence;
+  });
+  
+  console.log("Updated stimulus congruence based on political orientation:", state.politicalOrientation);
+  
+  // Also update congruence for previously collected data in state.data
+  state.data.forEach(dataRow => {
+    if (dataRow.block_type === 'MainExperiment' && dataRow.partisan_congruence === 'Pending') {
+      // Find the matching stimulus to get its updated congruence
+      const matchingStim = state.mainExperimentStimuli.find(
+        stim => stim.statement_id === dataRow.statement_id
+      );
+      
+      if (matchingStim) {
+        dataRow.partisan_congruence = matchingStim.partisan_congruence;
+      }
+    }
+  });
+  
+  console.log("Updated congruence in existing data records");
 }
 
 // ------------------- INSTRUCTIONS SCREEN (UPDATED TO BE GENERIC WITHOUT REVEALING HEADLINE TYPE) -------------------
@@ -1050,7 +1092,7 @@ async function runSingleTrial(stimulus, isPracticeTrial = false) {
     headline_type: isPracticeTrial ? 'Practice' : stimulus.headline_type,
     truth_value_stimulus: stimulus.truth_value ? 'TRUE' : 'FALSE', 
     partisan_alignment_stimulus: stimulus.partisan_alignment,
-    partisan_congruence: stimulus.partisan_congruence || 'N/A', 
+    partisan_congruence: stimulus.partisan_congruence || 'Pending', // Use 'Pending' until we determine political orientation
     is_practice_trial: isPracticeTrial ? 1 : 0,
     is_attention_check: stimulus.is_attention_check ? 1 : 0, 
     response: participantResponse,
@@ -1382,7 +1424,7 @@ function finishExperiment(){
     // Then collect Prolific ID
     await introScreen();
     
-    // Then collect demographics and political orientation questionnaire
+    // Then collect basic demographics (age, gender, education) only
     await runDemographics();
     
     show('<h2>Preparing experiment trials...</h2>');
@@ -1391,6 +1433,9 @@ function finishExperiment(){
     await showInstructionsScreen();
     await runPracticeBlock();
     await runMainExperimentBlock();
+    
+    // After main task is complete, run the political questionnaire
+    await runPoliticalQuestionnaire();
     
     finishExperiment();
 
