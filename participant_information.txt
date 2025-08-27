@@ -44,7 +44,7 @@
     <p>If you decide to take part in the research project, you will first complete a short screening questionnaire (about one minute) to determine your eligibility. If you meet the requirements and choose to continue, you will see 40 statements—some true, some false.</p>
     <p>You will then complete a reaction-time task: for each statement you have up to 10&nbsp;seconds to decide if you believe it is true or false (press “1” for True and “0” for False). Please respond as quickly as possible.</p>
     <p>After this task you will answer a brief questionnaire about your perception of each statement, followed by some non-identifying demographic questions.</p>
-    <p>The entire study is expected to last about 15&nbsp;minutes. There are no costs associated with participating, and you will receive <strong>$7&nbsp;AUD</strong> for your time. If the screening questionnaire shows you do not meet the requirements, you will not be able to participate.</p>
+    <p>The entire study is expected to last about 15&nbsp;minutes. There are no costs associated with participating, and you will receive <strong>$3.77 USD</strong> for your time. If the screening questionnaire shows you do not meet the requirements, you will not be able to participate.</p>
 
     <h2>4. Other relevant information about the research project</h2>
     <p>Approximately 75 participants will take part in the study.</p>
