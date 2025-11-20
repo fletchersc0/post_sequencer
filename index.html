@@ -1473,8 +1473,28 @@ async function showDebriefing() {
   };
 }
 
-// FIXED: Improved finishExperiment function with better error handling
+// FIXED: Improved finishExperiment function with better error handling AND data backfilling
 function finishExperiment(){ 
+  // --- FIX START: Backfill political orientation data into all rows ---
+  // Since these values were collected AFTER the trials, the existing rows have null/empty values.
+  // We update them now so the export includes the questionnaire responses.
+  state.data.forEach(row => {
+    row.partisanship_q1 = state.partisanship_q1;
+    row.partisanship_q2 = state.partisanship_q2;
+    row.partisanship_q3 = state.partisanship_q3;
+    row.partisanship_q4 = state.partisanship_q4;
+    row.partisanship_q5 = state.partisanship_q5;
+    row.partisanship_q6_orientation = state.partisanship_q6_orientation;
+    
+    // Update political orientation classification which was empty during trials
+    row.political_orientation = state.politicalOrientation;
+    
+    // Also ensure these derived values are consistent across all rows
+    row.is_moderate = state.isModerate ? 1 : 0;
+    row.congruence_assignment_basis = state.congruenceAssignmentBasis;
+  });
+  // --- FIX END ---
+
   const csv = toCSV(state.data);
   const filename = `${CONFIG.experimentName.replace(/\s+/g, '_')}_${state.prolificID}_${state.participantHeadlineType}_${new Date().toISOString().slice(0,10)}.csv`;
   
